@@ -284,6 +284,12 @@
         .mail-composer h2 { font-size: 1.2rem; margin-bottom: 1.25rem; color: var(--accent-blue); }
         .mail-field { margin-bottom: 1rem; }
         .mail-field label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 600; }
+        .mail-field select {
+            width: 100%; background: var(--card); border: 1px solid var(--card-border);
+            border-radius: 10px; padding: 0.6rem 0.8rem; color: var(--text);
+            font-size: 0.9rem; cursor: pointer;
+        }
+        .mail-field select:focus { outline: none; border-color: var(--accent-blue); }
         .mail-field input, .mail-field textarea {
             width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--card-border);
             border-radius: 10px; background: var(--progress-bg); color: var(--text);
@@ -404,6 +410,16 @@
         <div id="mail-reminders"></div>
         <div class="mail-composer">
             <h2>📧 Rédiger un mail</h2>
+            <div class="mail-field">
+                <label>Expéditeur</label>
+                <select id="mailFrom">
+                    <option value="isen.naiken@nexomedis.com">isen.naiken@nexomedis.com</option>
+                    <option value="isen.naiken@revue-ia-sante.fr">isen.naiken@revue-ia-sante.fr</option>
+                    <option value="redaction@revue-ia-sante.fr">redaction@revue-ia-sante.fr</option>
+                    <option value="Isen_Naiken@etu.ube.fr">Isen_Naiken@etu.ube.fr</option>
+                    <option value="isennaiken3@gmail.com">isennaiken3@gmail.com</option>
+                </select>
+            </div>
             <div class="mail-field">
                 <label>Destinataires</label>
                 <div class="autocomplete-wrapper">
@@ -1125,6 +1141,7 @@ async function reformulateMail() {
 }
 
 async function saveMailEml() {
+    const from = document.getElementById('mailFrom').value;
     const to = getMailToValue();
     const subject = document.getElementById('mailSubject').value.trim();
     const body = document.getElementById('mailBody').value.trim();
@@ -1133,7 +1150,7 @@ async function saveMailEml() {
         const r = await fetch('/api/save-eml', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to, subject, body })
+            body: JSON.stringify({ from, to, subject, body })
         });
         const result = await r.json();
         if (result.ok) {
@@ -1147,6 +1164,7 @@ async function saveMailEml() {
 }
 
 async function openInThunderbird() {
+    const from = document.getElementById('mailFrom').value;
     const to = getMailToValue();
     const subject = document.getElementById('mailSubject').value.trim();
     const body = document.getElementById('mailBody').value.trim();
@@ -1155,7 +1173,7 @@ async function openInThunderbird() {
         const r = await fetch('/api/open-thunderbird', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to, subject, body })
+            body: JSON.stringify({ from, to, subject, body })
         });
         const result = await r.json();
         if (result.ok) {

@@ -128,16 +128,17 @@ def ai_generate_reminder(payload):
     return json.loads(content.strip())
 
 
-def build_eml(to_addr, subject, body_text):
+def build_eml(from_addr, to_addr, subject, body_text):
     msg = MIMEText(body_text, "plain", "utf-8")
+    msg["From"] = from_addr
     msg["To"] = to_addr
     msg["Subject"] = subject
     msg["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0100")
     return msg.as_string()
 
 
-def save_eml_to_downloads(to_addr, subject, body_text):
-    eml_content = build_eml(to_addr, subject, body_text)
+def save_eml_to_downloads(from_addr, to_addr, subject, body_text):
+    eml_content = build_eml(from_addr, to_addr, subject, body_text)
     safe_subject = "".join(c for c in subject if c.isalnum() or c in " _-").strip()[:80] or "mail"
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{safe_subject}_{ts}.eml"
@@ -195,6 +196,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/api/save-eml":
             try:
                 filepath = save_eml_to_downloads(
+                    data.get("from", ""),
                     data.get("to", ""),
                     data.get("subject", ""),
                     data.get("body", "")
@@ -206,12 +208,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/api/open-thunderbird":
             try:
                 filepath = save_eml_to_downloads(
+                    data.get("from", ""),
                     data.get("to", ""),
                     data.get("subject", ""),
                     data.get("body", "")
                 )
                 subprocess.Popen(["thunderbird", "-compose",
-                    f"to='{data.get('to', '')}',subject='{data.get('subject', '')}',body='{data.get('body', '')}'"])
+                    f"from='{data.get('from', '')}',to='{data.get('to', '')}',subject='{data.get('subject', '')}',body='{data.get('body', '')}'"])
                 return self._json({"ok": True, "path": filepath})
             except Exception as e:
                 return self._json({"error": str(e)}, 500)
