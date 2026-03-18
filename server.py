@@ -104,6 +104,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 return self._json({"error": str(e)}, 500)
 
+        if self.path == "/api/run-v3":
+            import subprocess
+            v3_path = os.path.join(DIR, "v3.py")
+            try:
+                result = subprocess.run([
+                    "python3", v3_path
+                ], capture_output=True, text=True, timeout=300)
+                if result.returncode == 0:
+                    return self._json({"ok": True, "output": result.stdout})
+                else:
+                    return self._json({"ok": False, "error": result.stderr or "Erreur inconnue"}, 500)
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 500)
+
         self.send_error(404)
 
     def _json(self, obj, code=200):

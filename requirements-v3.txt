@@ -1,0 +1,2 @@
+# Dependencies for v3.py
+html2text>=2020.1.16

@@ -418,9 +418,26 @@ function renderHeader() {
                 ${editMode ? '✅ Terminer' : '✏️ Éditer'}
             </button>
             <button onclick="organize()">🤖 Organiser</button>
+            <button onclick="runV3()">▶️ Exécuter v3.py</button>
             <button onclick="openSettings()">⚙️</button>
         </div>
     </header>`;
+// --- Run v3.py ---
+async function runV3() {
+    if (!confirm('Lancer le script v3.py ?')) return;
+    showToast('Exécution de v3.py...', 'success', 2000);
+    try {
+        const r = await fetch('/api/run-v3', { method: 'POST' });
+        const result = await r.json();
+        if (result.ok) {
+            showToast('v3.py exécuté avec succès !', 'success');
+        } else {
+            showToast('Erreur : ' + (result.error || 'Échec exécution v3.py'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    }
+}
 }
 
 function renderProgress() {
