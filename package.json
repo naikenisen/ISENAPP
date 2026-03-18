@@ -1,0 +1,13 @@
+{
+  "name": "todoapp",
+  "version": "1.0.0",
+  "description": "Todo & Mail — application Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}
