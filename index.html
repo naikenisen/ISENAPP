@@ -313,6 +313,32 @@
         .autocomplete-item .ac-name { color: var(--text); }
         .autocomplete-item .ac-email { color: var(--text-muted); font-size: 0.8rem; }
 
+        /* ─── Email Tags (multi-recipient) ────────────── */
+        .email-tags-container {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+            width: 100%; background: var(--card); border: 1px solid var(--card-border);
+            border-radius: 10px; padding: 0.45rem 0.6rem; min-height: 42px;
+            cursor: text; transition: border-color 0.2s;
+        }
+        .email-tags-container:focus-within { border-color: var(--accent-blue); }
+        .email-tag {
+            display: inline-flex; align-items: center; gap: 0.3rem;
+            background: rgba(108,138,255,0.18); color: var(--accent-blue);
+            border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.8rem;
+            max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .email-tag .tag-remove {
+            cursor: pointer; font-size: 1rem; line-height: 1;
+            opacity: 0.6; transition: opacity 0.15s; margin-left: 0.15rem;
+        }
+        .email-tag .tag-remove:hover { opacity: 1; }
+        .email-tags-input {
+            flex: 1; min-width: 120px; border: none; outline: none;
+            background: transparent; color: var(--text); font-size: 0.9rem;
+            padding: 0.15rem 0;
+        }
+        .email-tags-input::placeholder { color: var(--text-muted); }
+
         /* ─── Terminal Output ────────────────────────── */
         .terminal-output {
             background: #0d0d0d; border: 1px solid var(--card-border); border-radius: 12px;
@@ -379,10 +405,12 @@
         <div class="mail-composer">
             <h2>📧 Rédiger un mail</h2>
             <div class="mail-field">
-                <label>Destinataire</label>
+                <label>Destinataires</label>
                 <div class="autocomplete-wrapper">
-                    <input type="text" id="mailTo" placeholder="Tapez un nom ou email…" autocomplete="off"
-                        oninput="onContactInput()" onfocus="onContactInput()">
+                    <div class="email-tags-container" id="mailToTags" onclick="document.getElementById('mailToInput').focus()">
+                        <input type="text" class="email-tags-input" id="mailToInput" placeholder="Tapez un nom ou email…" autocomplete="off"
+                            oninput="onContactInput()" onfocus="onContactInput()" onkeydown="onTagKeydown(event)">
+                    </div>
                     <div class="autocomplete-list" id="contactList"></div>
                 </div>
             </div>
@@ -1035,19 +1063,55 @@ async function organize() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   Contact Autocomplete
+   Contact Autocomplete (multi-recipient)
    ═══════════════════════════════════════════════════════ */
+let mailRecipients = [];
+
+function renderMailTags() {
+    const container = document.getElementById('mailToTags');
+    const input = document.getElementById('mailToInput');
+    container.querySelectorAll('.email-tag').forEach(t => t.remove());
+    mailRecipients.forEach((email, i) => {
+        const tag = document.createElement('span');
+        tag.className = 'email-tag';
+        const c = contacts.find(c => c.email === email);
+        tag.innerHTML = `${esc(c ? c.name : email)}<span class="tag-remove" onclick="removeRecipient(${i})">&times;</span>`;
+        tag.title = email;
+        container.insertBefore(tag, input);
+    });
+}
+
+function addRecipient(email) {
+    email = email.trim();
+    if (!email || mailRecipients.includes(email)) return;
+    mailRecipients.push(email);
+    renderMailTags();
+    const input = document.getElementById('mailToInput');
+    input.value = '';
+    document.getElementById('contactList').classList.remove('show');
+}
+
+function removeRecipient(index) {
+    mailRecipients.splice(index, 1);
+    renderMailTags();
+}
+
+function getMailToValue() {
+    return mailRecipients.join(', ');
+}
+
 function onContactInput() {
-    const input = document.getElementById('mailTo');
+    const input = document.getElementById('mailToInput');
     const list = document.getElementById('contactList');
     const val = input.value.toLowerCase().trim();
     if (!val || val.length < 1) { list.classList.remove('show'); return; }
     const matches = contacts.filter(c =>
-        c.name.toLowerCase().includes(val) || c.email.toLowerCase().includes(val)
+        !mailRecipients.includes(c.email) &&
+        (c.name.toLowerCase().includes(val) || c.email.toLowerCase().includes(val))
     ).slice(0, 10);
     if (!matches.length) { list.classList.remove('show'); return; }
     list.innerHTML = matches.map(c =>
-        `<div class="autocomplete-item" onclick="selectContact('${esc(c.email)}','${esc(c.name)}')">
+        `<div class="autocomplete-item" onclick="selectContact('${esc(c.email)}')">
             <span class="ac-name">${esc(c.name)}</span>
             <span class="ac-email">${esc(c.email)}</span>
         </div>`
@@ -1055,9 +1119,19 @@ function onContactInput() {
     list.classList.add('show');
 }
 
-function selectContact(email, name) {
-    document.getElementById('mailTo').value = email;
-    document.getElementById('contactList').classList.remove('show');
+function selectContact(email) {
+    addRecipient(email);
+}
+
+function onTagKeydown(e) {
+    const input = document.getElementById('mailToInput');
+    if ((e.key === 'Enter' || e.key === ',' || e.key === 'Tab') && input.value.trim()) {
+        e.preventDefault();
+        addRecipient(input.value.replace(/,/g, '').trim());
+    }
+    if (e.key === 'Backspace' && !input.value && mailRecipients.length) {
+        removeRecipient(mailRecipients.length - 1);
+    }
 }
 
 // Close autocomplete on outside click
@@ -1101,10 +1175,10 @@ async function reformulateMail() {
 }
 
 async function saveMailEml() {
-    const to = document.getElementById('mailTo').value.trim();
+    const to = getMailToValue();
     const subject = document.getElementById('mailSubject').value.trim();
     const body = document.getElementById('mailBody').value.trim();
-    if (!to || !subject) { showToast('Remplis le destinataire et le sujet.', 'error'); return; }
+    if (!to || !subject) { showToast('Remplis le(s) destinataire(s) et le sujet.', 'error'); return; }
     try {
         const r = await fetch('/api/save-eml', {
             method: 'POST',
@@ -1123,10 +1197,10 @@ async function saveMailEml() {
 }
 
 async function openInThunderbird() {
-    const to = document.getElementById('mailTo').value.trim();
+    const to = getMailToValue();
     const subject = document.getElementById('mailSubject').value.trim();
     const body = document.getElementById('mailBody').value.trim();
-    if (!to || !subject) { showToast('Remplis le destinataire et le sujet.', 'error'); return; }
+    if (!to || !subject) { showToast('Remplis le(s) destinataire(s) et le sujet.', 'error'); return; }
     try {
         const r = await fetch('/api/open-thunderbird', {
             method: 'POST',

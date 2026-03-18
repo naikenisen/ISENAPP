@@ -168,6 +168,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=DIR, **kw)
 
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        super().end_headers()
+
     def do_GET(self):
         if self.path == "/api/state":
             return self._json(load())
