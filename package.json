@@ -1,0 +1,92 @@
+{
+  "name": "isenapp",
+  "version": "1.0.0",
+  "description": "ISENAPP — Client email Electron avec gestion de tâches, autoconfig email et visualisation Obsidian",
+  "author": {
+    "name": "Isen Naiken",
+    "email": "isen.naiken@nexomedis.com"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "icons:generate": "mkdir -p build && npx --yes icon-gen -i logo.svg -o build --ico --icns && mv -f build/app.icns build/icon.icns && mv -f build/app.ico build/icon.ico && rsvg-convert -w 512 -h 512 logo.svg -o build/icon.png",
+    "build": "electron-builder --linux",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --linux --mac --win",
+    "build:dir": "electron-builder --linux --dir"
+  },
+  "build": {
+    "appId": "com.nexomedis.isenapp",
+    "productName": "ISENAPP",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "index.html",
+        "to": "index.html"
+      },
+      {
+        "from": "logo.svg",
+        "to": "logo.svg"
+      },
+      {
+        "from": "server.py",
+        "to": "server.py"
+      },
+      {
+        "from": "v3.py",
+        "to": "v3.py"
+      },
+      {
+        "from": "data.json",
+        "to": "data.json"
+      },
+      {
+        "from": "contacts_complets_v2.csv",
+        "to": "contacts_complets_v2.csv"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-window-state": "^5.0.3"
+  }
+}

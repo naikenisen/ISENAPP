@@ -3,31 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Todo & Mail</title>
+    <title>ISENAPP</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
+    <link rel="shortcut icon" href="/logo.svg">
+    <link rel="apple-touch-icon" href="/logo.svg">
+    <meta property="og:image" content="/logo.svg">
+    <meta name="twitter:image" content="/logo.svg">
+    <link rel="stylesheet" href="https://unpkg.com/lucide-static@0.460.0/font/lucide.css">
     <style>
-        /* ─── Variables & Reset ──────────────────────── */
+        /* ─── Obsidian / VSCode Dark Theme ────────────── */
         :root {
-            --bg: #0f1117;
-            --card: #1a1d2e;
-            --card-border: #2a2d3e;
-            --text: #e2e4eb;
-            --text-muted: #8b8fa3;
-            --accent-blue: #6c8aff;
-            --accent-green: #34d399;
-            --accent-orange: #f59e0b;
-            --accent-purple: #a78bfa;
-            --accent-pink: #f472b6;
-            --accent-slate: #94a3b8;
-            --progress-bg: #252840;
-            --checked: #34d399;
+            --bg: #1e1e2e;
+            --bg-surface: #181825;
+            --card: #1e1e2e;
+            --card-border: #313244;
+            --card-hover: #262637;
+            --text: #cdd6f4;
+            --text-muted: #6c7086;
+            --accent-blue: #89b4fa;
+            --accent-blue-glow: rgba(137, 180, 250, 0.08);
+            --accent-green: #a6e3a1;
+            --accent-orange: #fab387;
+            --accent-purple: #cba6f7;
+            --accent-pink: #f38ba8;
+            --accent-slate: #9399b2;
+            --progress-bg: #11111b;
+            --checked: #a6e3a1;
+            --titlebar-bg: #11111b;
+            --titlebar-border: #313244;
+            --titlebar-btn-hover: rgba(255,255,255,0.06);
+            --titlebar-close-hover: #e04040;
+            --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
-            padding: 2rem 1rem;
+            padding: 0;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* ─── Scrollbar Hiding & Custom ────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* Re-enable selection on editable content */
+        input, textarea, [contenteditable], .task-label, .terminal-output, .mail-field textarea, .mail-field input {
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        /* ─── Custom Titlebar ─────────────────────────── */
+        .titlebar {
+            display: flex;
+            align-items: center;
+            height: 38px;
+            background: var(--titlebar-bg);
+            border-bottom: 1px solid var(--titlebar-border);
+            -webkit-app-region: drag;
+            app-region: drag;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 50000;
+            padding: 0 8px;
+            gap: 10px;
+        }
+        .titlebar-icon {
+            width: 18px; height: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+            -webkit-app-region: no-drag;
+        }
+        .titlebar-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        .titlebar-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            flex: 1;
+        }
+        .titlebar-controls {
+            display: flex;
+            -webkit-app-region: no-drag;
+            app-region: no-drag;
+        }
+        .titlebar-btn {
+            width: 46px; height: 38px;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .titlebar-btn:hover {
+            background: var(--titlebar-btn-hover);
+            color: var(--text);
+        }
+        .titlebar-btn.close:hover {
+            background: var(--titlebar-close-hover);
+            color: #fff;
+        }
+        .titlebar-btn svg {
+            width: 16px; height: 16px;
+            stroke: currentColor; stroke-width: 1.5;
+            fill: none;
+        }
+
+        /* ─── App Content Area (below titlebar) ────────── */
+        .app-content {
+            margin-top: 38px;
+            height: calc(100vh - 38px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1rem 0.75rem;
         }
 
         /* ─── Layout ─────────────────────────────────── */
@@ -35,46 +139,47 @@
 
         /* ─── Tabs ───────────────────────────────────── */
         .tab-bar {
-            display: flex; gap: 0; justify-content: center; margin-bottom: 2rem;
-            background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
-            overflow: hidden;
+            display: flex; gap: 0; margin-bottom: 1.5rem;
+            background: var(--bg-surface); border-bottom: 1px solid var(--card-border);
         }
         .tab-btn {
-            flex: 1; padding: 0.85rem 1.5rem; border: none; background: transparent;
-            color: var(--text-muted); cursor: pointer; font-size: 1rem; font-weight: 600;
-            transition: all 0.2s; text-align: center;
+            padding: 0.6rem 1.2rem; border: none; background: transparent;
+            color: var(--text-muted); cursor: pointer; font-size: 0.82rem; font-weight: 500;
+            transition: all 0.15s; text-align: center; position: relative;
+            display: flex; align-items: center; gap: 0.45rem; letter-spacing: 0.01em;
         }
-        .tab-btn:hover { background: rgba(108,138,255,0.08); color: var(--text); }
+        .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
         .tab-btn.active {
-            background: rgba(108,138,255,0.2); color: var(--accent-blue);
-            box-shadow: inset 0 -3px 0 var(--accent-blue);
+            color: var(--text);
+            box-shadow: inset 0 -2px 0 var(--accent-blue);
         }
+        .tab-btn i { font-size: 14px; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
         /* ─── Header ─────────────────────────────────── */
-        header { text-align: center; margin-bottom: 2.5rem; }
-        header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+        header { text-align: center; margin-bottom: 1.5rem; }
+        header h1 { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem; justify-content: center; }
         .header-actions {
             display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.75rem; flex-wrap: wrap;
         }
         .header-actions button, .mail-actions button {
-            padding: 0.5rem 1rem; border: 1px solid var(--card-border); border-radius: 10px;
-            background: var(--card); color: var(--text-muted); cursor: pointer;
-            font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+            padding: 0.4rem 0.8rem; border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+            background: transparent; color: var(--text-muted); cursor: pointer;
+            font-size: 0.8rem; font-weight: 500; transition: all 0.15s;
+            display: inline-flex; align-items: center; gap: 0.35rem;
         }
         .header-actions button:hover, .mail-actions button:hover {
-            background: rgba(108,138,255,0.15); border-color: var(--accent-blue); color: var(--text);
+            background: rgba(137,180,250,0.08); color: var(--text);
         }
         .header-actions button.active {
-            background: rgba(108,138,255,0.2); border-color: var(--accent-blue); color: var(--accent-blue);
+            background: rgba(137,180,250,0.1); color: var(--accent-blue);
         }
 
         /* ─── Global Progress ────────────────────────── */
         .global-progress {
-            background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
-            padding: 1.5rem 2rem; margin-bottom: 2.5rem; position: sticky; top: 1rem; z-index: 100;
-            backdrop-filter: blur(12px);
+            background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: var(--radius-md);
+            padding: 1rem 1.25rem; margin-bottom: 1.5rem; position: sticky; top: 0; z-index: 100;
         }
         .global-progress-header {
             display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem;
@@ -83,22 +188,22 @@
         .global-progress-header .counter { font-size: 0.9rem; color: var(--text-muted); }
         .global-progress-header .counter strong { color: var(--accent-green); }
         .progress-bar-track {
-            width: 100%; height: 10px; background: var(--progress-bg);
-            border-radius: 99px; overflow: hidden;
+            width: 100%; height: 3px; background: var(--progress-bg);
+            border-radius: 2px; overflow: hidden;
         }
         .progress-bar-fill {
-            height: 100%; border-radius: 99px;
+            height: 100%; border-radius: 2px;
             background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
-            transition: width 0.5s ease; width: 0%;
+            transition: width 0.4s ease; width: 0%;
         }
         .progress-percent { text-align: right; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem; }
 
         /* ─── Section ────────────────────────────────── */
         .section {
-            background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
-            margin-bottom: 1.5rem; overflow: hidden; transition: box-shadow 0.3s, outline 0.2s;
+            background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: var(--radius-md);
+            margin-bottom: 1rem; overflow: hidden; transition: background 0.15s;
         }
-        .section:hover { box-shadow: 0 0 30px rgba(108,138,255,0.06); }
+        .section:hover { background: var(--card-hover); }
         .section-header {
             padding: 1.25rem 1.5rem; display: flex; justify-content: space-between;
             align-items: center; cursor: pointer; user-select: none;
@@ -108,7 +213,7 @@
         body.edit-mode .section-header:hover { background: transparent; }
         .section-title { font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
         .section-badge {
-            font-size: 0.75rem; padding: 0.15rem 0.6rem; border-radius: 99px; font-weight: 600;
+            font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 3px; font-weight: 500;
         }
         .section-desc {
             padding: 0 1.5rem; font-size: 0.85rem; color: var(--text-muted);
@@ -116,10 +221,10 @@
         }
         .section-header-right { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
         .section-progress-mini { width: 120px; display: flex; align-items: center; gap: 0.6rem; }
-        .section-progress-mini .mini-bar {
-            flex: 1; height: 5px; background: var(--progress-bg); border-radius: 99px; overflow: hidden;
+        .mini-bar {
+            flex: 1; height: 3px; background: var(--progress-bg); border-radius: 2px; overflow: hidden;
         }
-        .section-progress-mini .mini-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; width: 0%; }
+        .section-progress-mini .mini-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; width: 0%; }
         .section-progress-mini .mini-text { font-size: 0.75rem; color: var(--text-muted); min-width: 32px; text-align: right; }
 
         /* ─── Colors Per Section ─────────────────────── */
@@ -145,31 +250,31 @@
         /* ─── Tasks ──────────────────────────────────── */
         .task-list { padding: 0 1rem 1rem; }
         .task-item {
-            display: flex; align-items: flex-start; gap: 0.75rem;
-            padding: 0.7rem 0.75rem; border-radius: 10px; transition: background 0.15s;
+            display: flex; align-items: flex-start; gap: 0.6rem;
+            padding: 0.5rem 0.6rem; border-radius: var(--radius-sm); transition: background 0.1s;
         }
-        .task-item:hover { background: rgba(255,255,255,0.025); }
+        .task-item:hover { background: rgba(255,255,255,0.02); }
         .task-item.checked .task-label { text-decoration: line-through; color: var(--text-muted); }
         .task-item.checked .custom-check { background: var(--checked); border-color: var(--checked); }
         .task-item.checked .custom-check svg { opacity: 1; }
         .task-item.sub-task { margin-left: 2rem; }
-        .task-item.is-mail .task-label::before { content: '📧 '; }
+        .task-item.is-mail .task-label::before { content: ''; }
         .custom-check {
-            width: 22px; height: 22px; min-width: 22px; border: 2px solid var(--card-border);
-            border-radius: 6px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: all 0.2s; margin-top: 2px;
+            width: 18px; height: 18px; min-width: 18px; border: 1.5px solid var(--card-border);
+            border-radius: 3px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.15s; margin-top: 2px;
         }
         .custom-check:hover { border-color: var(--accent-blue); }
         .custom-check svg { width: 14px; height: 14px; opacity: 0; transition: opacity 0.2s; stroke: white; stroke-width: 3; fill: none; }
-        .task-label { font-size: 0.95rem; cursor: pointer; flex: 1; transition: color 0.3s; }
+        .task-label { font-size: 0.88rem; cursor: pointer; flex: 1; transition: color 0.2s; }
         .task-note { display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem; font-style: italic; }
 
         /* ─── Edit Mode ──────────────────────────────── */
         .task-edit-fields { flex: 1; display: flex; flex-direction: column; gap: 0.25rem; }
         .task-input, .task-note-input {
             width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--card-border);
-            border-radius: 8px; background: var(--progress-bg); color: var(--text);
-            font-size: 0.9rem; font-family: inherit;
+            border-radius: var(--radius-sm); background: var(--progress-bg); color: var(--text);
+            font-size: 0.85rem; font-family: inherit;
         }
         .task-note-input { font-size: 0.8rem; color: var(--text-muted); }
         .task-input:focus, .task-note-input:focus { outline: none; border-color: var(--accent-blue); }
@@ -180,15 +285,15 @@
         .btn-icon:hover { opacity: 1; }
         .edit-actions { display: flex; gap: 0.2rem; align-items: flex-start; margin-top: 2px; }
         .add-task-btn {
-            width: 100%; padding: 0.6rem; border: 1px dashed var(--card-border);
-            border-radius: 10px; background: transparent; color: var(--text-muted);
-            cursor: pointer; font-size: 0.85rem; transition: all 0.2s; margin-top: 0.5rem;
+            width: 100%; padding: 0.5rem; border: 1px dashed var(--card-border);
+            border-radius: var(--radius-sm); background: transparent; color: var(--text-muted);
+            cursor: pointer; font-size: 0.8rem; transition: all 0.15s; margin-top: 0.5rem;
         }
         .add-task-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
         .add-section-btn {
-            width: 100%; padding: 1rem; border: 1px dashed var(--card-border);
-            border-radius: 16px; background: transparent; color: var(--text-muted);
-            cursor: pointer; font-size: 1rem; transition: all 0.2s; margin-top: 1rem;
+            width: 100%; padding: 0.8rem; border: 1px dashed var(--card-border);
+            border-radius: var(--radius-md); background: transparent; color: var(--text-muted);
+            cursor: pointer; font-size: 0.85rem; transition: all 0.15s; margin-top: 0.75rem;
         }
         .add-section-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
 
@@ -204,24 +309,25 @@
         }
         .modal-overlay.show { display: flex; }
         .modal {
-            background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
-            padding: 2rem; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;
+            background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: var(--radius-lg);
+            padding: 1.5rem; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;
         }
         .modal h2 { margin-bottom: 1.5rem; font-size: 1.2rem; }
         .form-group { margin-bottom: 1.25rem; }
         .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 600; }
         .form-group input[type="text"], .form-group input[type="password"] {
-            width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--card-border);
-            border-radius: 10px; background: var(--progress-bg); color: var(--text);
-            font-size: 0.9rem; font-family: inherit;
+            width: 100%; padding: 0.5rem 0.7rem; border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); background: var(--progress-bg); color: var(--text);
+            font-size: 0.85rem; font-family: inherit;
         }
         .form-group input:focus { outline: none; border-color: var(--accent-blue); }
         .form-group small { display: block; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; }
         .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
         .modal-actions button {
-            padding: 0.6rem 1.2rem; border: 1px solid var(--card-border); border-radius: 10px;
+            padding: 0.45rem 1rem; border: 1px solid var(--card-border); border-radius: var(--radius-sm);
             background: var(--progress-bg); color: var(--text-muted); cursor: pointer;
-            font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+            font-size: 0.8rem; font-weight: 500; transition: all 0.15s;
+            display: inline-flex; align-items: center; gap: 0.3rem;
         }
         .modal-actions button:hover { border-color: var(--accent-blue); color: var(--text); }
         .btn-primary { background: var(--accent-blue) !important; border-color: var(--accent-blue) !important; color: white !important; }
@@ -263,11 +369,11 @@
 
         /* ─── Toast ──────────────────────────────────── */
         .toast {
-            position: fixed; bottom: 2rem; left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            padding: 0.6rem 1.5rem; border-radius: 10px;
-            font-weight: 600; font-size: 0.85rem; opacity: 0;
-            transition: all 0.4s ease; z-index: 10000; pointer-events: none;
+            position: fixed; bottom: 1.5rem; left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            padding: 0.5rem 1.2rem; border-radius: var(--radius-sm);
+            font-weight: 500; font-size: 0.8rem; opacity: 0;
+            transition: all 0.3s ease; z-index: 10000; pointer-events: none;
         }
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         .toast.success { background: var(--accent-green); color: #0f1117; }
@@ -278,22 +384,22 @@
 
         /* ─── Mail Tab ───────────────────────────────── */
         .mail-composer {
-            background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
-            padding: 1.5rem; margin-bottom: 1.5rem;
+            background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: var(--radius-md);
+            padding: 1.25rem; margin-bottom: 1rem;
         }
-        .mail-composer h2 { font-size: 1.2rem; margin-bottom: 1.25rem; color: var(--accent-blue); }
+        .mail-composer h2 { font-size: 1.05rem; margin-bottom: 1rem; color: var(--accent-blue); font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
         .mail-field { margin-bottom: 1rem; }
         .mail-field label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 600; }
         .mail-field select {
-            width: 100%; background: var(--card); border: 1px solid var(--card-border);
-            border-radius: 10px; padding: 0.6rem 0.8rem; color: var(--text);
-            font-size: 0.9rem; cursor: pointer;
+            width: 100%; background: var(--bg-surface); border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; color: var(--text);
+            font-size: 0.85rem; cursor: pointer;
         }
         .mail-field select:focus { outline: none; border-color: var(--accent-blue); }
         .mail-field input, .mail-field textarea {
-            width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--card-border);
-            border-radius: 10px; background: var(--progress-bg); color: var(--text);
-            font-size: 0.9rem; font-family: inherit; resize: vertical;
+            width: 100%; padding: 0.5rem 0.7rem; border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); background: var(--progress-bg); color: var(--text);
+            font-size: 0.85rem; font-family: inherit; resize: vertical;
         }
         .mail-field textarea { min-height: 180px; line-height: 1.6; }
         .mail-field input:focus, .mail-field textarea:focus { outline: none; border-color: var(--accent-blue); }
@@ -306,31 +412,31 @@
         .autocomplete-wrapper { position: relative; }
         .autocomplete-list {
             position: absolute; top: 100%; left: 0; right: 0;
-            background: var(--card); border: 1px solid var(--card-border);
-            border-radius: 10px; max-height: 180px; overflow-y: auto;
+            background: var(--bg-surface); border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); max-height: 180px; overflow-y: auto;
             z-index: 500; display: none;
         }
         .autocomplete-list.show { display: block; }
         .autocomplete-item {
-            padding: 0.5rem 0.8rem; cursor: pointer; font-size: 0.85rem;
-            transition: background 0.15s; display: flex; justify-content: space-between;
+            padding: 0.4rem 0.7rem; cursor: pointer; font-size: 0.8rem;
+            transition: background 0.1s; display: flex; justify-content: space-between;
         }
-        .autocomplete-item:hover { background: rgba(108,138,255,0.15); }
+        .autocomplete-item:hover { background: rgba(137,180,250,0.08); }
         .autocomplete-item .ac-name { color: var(--text); }
         .autocomplete-item .ac-email { color: var(--text-muted); font-size: 0.8rem; }
 
         /* ─── Email Tags (multi-recipient) ────────────── */
         .email-tags-container {
             display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
-            width: 100%; background: var(--card); border: 1px solid var(--card-border);
-            border-radius: 10px; padding: 0.45rem 0.6rem; min-height: 42px;
-            cursor: text; transition: border-color 0.2s;
+            width: 100%; background: var(--bg-surface); border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); padding: 0.4rem 0.5rem; min-height: 36px;
+            cursor: text; transition: border-color 0.15s;
         }
         .email-tags-container:focus-within { border-color: var(--accent-blue); }
         .email-tag {
             display: inline-flex; align-items: center; gap: 0.3rem;
-            background: rgba(108,138,255,0.18); color: var(--accent-blue);
-            border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.8rem;
+            background: rgba(137,180,250,0.12); color: var(--accent-blue);
+            border-radius: 3px; padding: 0.15rem 0.4rem; font-size: 0.75rem;
             max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .email-tag .tag-remove {
@@ -347,17 +453,17 @@
 
         /* ─── Terminal Output ────────────────────────── */
         .terminal-output {
-            background: #0d0d0d; border: 1px solid var(--card-border); border-radius: 12px;
-            padding: 1rem; font-family: 'Fira Code', 'Cascadia Code', monospace;
-            font-size: 0.8rem; color: #34d399; max-height: 400px; overflow-y: auto;
-            white-space: pre-wrap; word-break: break-all; margin-top: 1rem;
+            background: #11111b; border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+            padding: 0.75rem; font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.78rem; color: #a6e3a1; max-height: 400px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-all; margin-top: 0.75rem;
         }
 
         /* ─── Reminder Banner ────────────────────────── */
         .reminder-banner {
-            background: rgba(245,158,11,0.15); border: 1px solid var(--accent-orange);
-            border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem;
-            display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+            background: rgba(250,179,135,0.08); border: 1px solid rgba(250,179,135,0.3);
+            border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 0.75rem;
+            display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
         }
         .reminder-banner .reminder-text { flex: 1; font-size: 0.9rem; color: var(--accent-orange); }
         .reminder-banner button {
@@ -369,13 +475,443 @@
             background: transparent; color: var(--text-muted); border-color: var(--card-border);
         }
 
-        /* ─── Mail Flag Toggle ───────────────────────── */
-        .mail-flag {
-            font-size: 0.8rem; padding: 0.15rem 0.4rem; border-radius: 6px;
-            cursor: pointer; border: 1px solid transparent; transition: all 0.2s;
+        /* ─── Mail Pending List ──────────────────────── */
+        .mail-pending-list {
+            background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: var(--radius-md);
+            margin-bottom: 1rem; overflow: hidden;
         }
-        .mail-flag.active { background: rgba(108,138,255,0.2); border-color: var(--accent-blue); }
-        .mail-flag:hover { background: rgba(108,138,255,0.1); }
+        .mail-pending-list h2 {
+            padding: 1.25rem 1.5rem; font-size: 1.1rem; font-weight: 700;
+            color: var(--accent-blue); border-bottom: 1px solid var(--card-border); margin: 0;
+        }
+        .mail-pending-empty {
+            padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;
+        }
+        .mail-group-label {
+            padding: 0.5rem 1.5rem 0; font-size: 0.7rem; color: var(--text-muted);
+            font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .mail-item {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--card-border);
+            cursor: pointer; transition: background 0.15s;
+        }
+        .mail-item:last-child { border-bottom: none; }
+        .mail-item:hover { background: rgba(137,180,250,0.04); }
+        .mail-item.selected { background: rgba(137,180,250,0.08); border-left: 2px solid var(--accent-blue); }
+        .mail-item.is-sent { opacity: 0.7; }
+        .mail-item-check {
+            width: 20px; height: 20px; min-width: 20px;
+            border: 2px solid var(--card-border); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .mail-item-check:hover { border-color: var(--accent-green); }
+        .mail-item-check.done { background: var(--accent-green); border-color: var(--accent-green); }
+        .mail-item-check.done svg { opacity: 1; }
+        .mail-item-check svg { width: 12px; height: 12px; opacity: 0; stroke: white; stroke-width: 3; fill: none; }
+        .mail-item-info { flex: 1; min-width: 0; }
+        .mail-item-label { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-item-section { font-size: 0.75rem; color: var(--text-muted); }
+        .mail-item-status {
+            font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 99px; font-weight: 600; white-space: nowrap;
+        }
+        .mail-item-status.pending { background: rgba(74,144,244,0.15); color: var(--accent-blue); }
+        .mail-item-status.sent { background: rgba(45,212,168,0.15); color: var(--accent-green); }
+        .mail-item-status.waiting { background: rgba(240,160,48,0.15); color: var(--accent-orange); }
+        .mail-item-status.responded { background: rgba(155,125,240,0.15); color: var(--accent-purple); }
+        .mail-item-actions { display: flex; gap: 0.3rem; }
+        .mail-item-actions button {
+            background: none; border: none; cursor: pointer; font-size: 0.8rem;
+            padding: 0.2rem 0.4rem; border-radius: 4px; transition: background 0.15s; opacity: 0.5;
+        }
+        .mail-item-actions button:hover { opacity: 1; background: rgba(255,255,255,0.05); }
+
+        /* ─── Timeline ──────────────────────────────── */
+        .timeline-container {
+            background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: var(--radius-md);
+            margin-bottom: 1rem; overflow: hidden;
+        }
+        .timeline-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 1.5rem; border-bottom: 1px solid var(--card-border);
+        }
+        .timeline-header h2 { font-size: 1.1rem; font-weight: 700; color: var(--accent-purple); margin: 0; }
+        .timeline-nav { display: flex; gap: 0.5rem; }
+        .timeline-nav button {
+            background: var(--progress-bg); border: 1px solid var(--card-border); border-radius: 6px;
+            color: var(--text-muted); cursor: pointer; padding: 0.25rem 0.6rem; font-size: 0.8rem;
+            transition: all 0.15s;
+        }
+        .timeline-nav button:hover { border-color: var(--accent-blue); color: var(--text); }
+        .timeline-scroll { overflow-x: auto; padding: 1.5rem 1rem 1rem; }
+        .timeline-track {
+            display: flex; position: relative; min-width: max-content; padding-bottom: 0.5rem;
+        }
+        .timeline-day {
+            display: flex; flex-direction: column; align-items: center; min-width: 44px; position: relative;
+        }
+        .timeline-day-label {
+            font-size: 0.6rem; color: var(--text-muted); margin-bottom: 0.5rem;
+            font-weight: 600; text-align: center; line-height: 1.3;
+        }
+        .timeline-line {
+            position: absolute; top: 34px; left: 0; right: 0; height: 2px;
+            background: var(--card-border); z-index: 0;
+        }
+        .timeline-dot {
+            width: 14px; height: 14px; border-radius: 50%; position: relative; z-index: 1;
+            cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border: 2px solid transparent;
+        }
+        .timeline-dot:hover { transform: scale(1.4); }
+        .timeline-dot.empty { width: 6px; height: 6px; background: var(--card-border); cursor: default; border: none; }
+        .timeline-dot.empty:hover { transform: none; }
+        .timeline-dot.sent { background: var(--accent-blue); border-color: var(--accent-blue); }
+        .timeline-dot.reminder-pending { background: var(--accent-slate); border-color: var(--accent-slate); }
+        .timeline-dot.reminder-due {
+            background: #ef4444; border-color: #ef4444;
+            box-shadow: 0 0 8px rgba(239,68,68,0.5);
+            animation: pulse-red 1.5s ease-in-out infinite;
+        }
+        .timeline-dot.reminder-sent { background: var(--accent-orange); border-color: var(--accent-orange); }
+        .timeline-dot.response { background: var(--accent-green); border-color: var(--accent-green); }
+        .timeline-dot.today-marker {
+            width: 10px; height: 10px; background: var(--accent-blue);
+            border: 2px solid white; box-shadow: 0 0 6px var(--accent-blue);
+        }
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 4px rgba(239,68,68,0.4); }
+            50% { box-shadow: 0 0 14px rgba(239,68,68,0.8); }
+        }
+        .timeline-event-label {
+            font-size: 0.55rem; color: var(--text-muted); max-width: 80px;
+            text-align: center; margin-top: 0.4rem; line-height: 1.2;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .timeline-today-col .timeline-day-label { color: var(--accent-blue); font-weight: 700; }
+        .timeline-popover {
+            position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+            background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: var(--radius-md);
+            padding: 0.6rem; min-width: 200px; z-index: 200;
+            box-shadow: var(--shadow-lg); display: none;
+        }
+        .timeline-popover.show { display: block; }
+        .timeline-popover-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .timeline-popover-actions { display: flex; flex-direction: column; gap: 0.3rem; }
+        .timeline-popover-actions button {
+            padding: 0.35rem 0.6rem; border: 1px solid var(--card-border); border-radius: 6px;
+            background: var(--progress-bg); color: var(--text); cursor: pointer;
+            font-size: 0.75rem; text-align: left; transition: all 0.15s;
+        }
+        .timeline-popover-actions button:hover { border-color: var(--accent-blue); background: rgba(74,144,244,0.1); }
+        .timeline-popover-actions button.danger:hover { border-color: #ef4444; background: rgba(239,68,68,0.1); color: #ef4444; }
+
+        /* ─── Add Task Buttons (two-button layout) ──── */
+        .add-task-buttons { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .add-task-buttons button {
+            flex: 1; padding: 0.5rem; border: 1px dashed var(--card-border);
+            border-radius: 10px; background: transparent; color: var(--text-muted);
+            cursor: pointer; font-size: 0.8rem; transition: all 0.2s; font-weight: 600;
+        }
+        .add-task-buttons button:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .add-task-buttons button.mail-btn:hover { border-color: var(--accent-purple); color: var(--accent-purple); }
+
+        /* ─── Mail Composer (selected state) ──────────── */
+        .mail-composer.has-selection { border-color: var(--accent-blue); }
+        .selected-task-banner {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.75rem; background: rgba(74,144,244,0.1);
+            border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem;
+        }
+        .selected-task-banner .deselect-btn {
+            margin-left: auto; background: none; border: none; cursor: pointer;
+            color: var(--text-muted); font-size: 0.9rem;
+        }
+        .selected-task-banner .deselect-btn:hover { color: var(--text); }
+        .btn-sent-confirm {
+            background: var(--accent-green) !important; border-color: var(--accent-green) !important;
+            color: #0f1117 !important; font-weight: 700;
+        }
+        .btn-response-received {
+            background: var(--accent-purple) !important; border-color: var(--accent-purple) !important;
+            color: white !important;
+        }
+        .task-type-badge {
+            font-size: 0.7rem; padding: 0.1rem 0.35rem; border-radius: 4px;
+            background: rgba(155,125,240,0.15); color: var(--accent-purple); font-weight: 600;
+        }
+
+        /* ─── Inbox Tab ──────────────────────────────── */
+        .inbox-layout {
+            display: flex; gap: 0; height: calc(100vh - 230px);
+            background: var(--bg-surface); border: 1px solid var(--card-border);
+            border-radius: var(--radius-md); overflow: hidden;
+        }
+        .inbox-list-panel {
+            width: 380px; min-width: 300px; border-right: 1px solid var(--card-border);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .inbox-reader-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .inbox-search {
+            padding: 0.75rem; border-bottom: 1px solid var(--card-border);
+        }
+        .inbox-search input {
+            width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); background: var(--progress-bg); color: var(--text);
+            font-size: 0.8rem; font-family: inherit;
+        }
+        .inbox-search input:focus { outline: none; border-color: var(--accent-blue); }
+        .inbox-filters {
+            display: flex; gap: 0; padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .inbox-filter-btn {
+            flex: 1; padding: 0.35rem 0.6rem; border: 1px solid var(--card-border);
+            background: transparent; color: var(--text-muted); cursor: pointer;
+            font-size: 0.75rem; font-weight: 600; transition: all 0.15s;
+        }
+        .inbox-filter-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+        .inbox-filter-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+        .inbox-filter-btn.active {
+            background: rgba(137,180,250,0.1); border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+        .inbox-list { flex: 1; overflow-y: auto; }
+        .inbox-item {
+            display: flex; align-items: center; gap: 0.6rem;
+            padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.03);
+            cursor: pointer; transition: background 0.12s;
+        }
+        .inbox-item:hover { background: rgba(137,180,250,0.04); }
+        .inbox-item.selected { background: rgba(137,180,250,0.08); border-left: 2px solid var(--accent-blue); }
+        .inbox-item.unread .inbox-item-from,
+        .inbox-item.unread .inbox-item-subject { font-weight: 700; color: var(--text); }
+        .inbox-item-dot {
+            width: 8px; height: 8px; min-width: 8px; border-radius: 50%;
+            background: transparent;
+        }
+        .inbox-item.unread .inbox-item-dot { background: var(--accent-blue); }
+        .inbox-item-star {
+            cursor: pointer; font-size: 0.9rem; opacity: 0.3; transition: opacity 0.15s;
+        }
+        .inbox-item-star:hover { opacity: 0.8; }
+        .inbox-item-star.starred { opacity: 1; color: #f59e0b; }
+        .inbox-item-content { flex: 1; min-width: 0; }
+        .inbox-item-top { display: flex; justify-content: space-between; align-items: baseline; }
+        .inbox-item-from {
+            font-size: 0.85rem; color: var(--text-muted); white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; max-width: 180px;
+        }
+        .inbox-item-date { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
+        .inbox-item-subject {
+            font-size: 0.85rem; color: var(--text-muted); white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        .inbox-item-preview {
+            font-size: 0.75rem; color: var(--text-muted); opacity: 0.6;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .inbox-item-attach {
+            font-size: 0.7rem; color: var(--text-muted); opacity: 0.5;
+        }
+        .inbox-reader {
+            flex: 1; overflow-y: auto; padding: 0;
+        }
+        .inbox-reader-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: 100%; color: var(--text-muted);
+            gap: 0.5rem;
+        }
+        .inbox-reader-header {
+            padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--card-border);
+        }
+        .inbox-reader-subject {
+            font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;
+        }
+        .inbox-reader-meta {
+            display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem;
+            font-size: 0.85rem; color: var(--text-muted);
+        }
+        .inbox-reader-meta strong { color: var(--text); }
+        .inbox-reader-actions {
+            display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;
+        }
+        .inbox-reader-actions button {
+            padding: 0.4rem 0.8rem; border: 1px solid var(--card-border); border-radius: 8px;
+            background: var(--progress-bg); color: var(--text-muted); cursor: pointer;
+            font-size: 0.8rem; font-weight: 600; transition: all 0.15s;
+        }
+        .inbox-reader-actions button:hover {
+            border-color: var(--accent-blue); color: var(--text);
+            background: rgba(74,144,244,0.1);
+        }
+        .inbox-reader-actions button.danger:hover {
+            border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.1);
+        }
+        .inbox-reader-body {
+            padding: 1.5rem; font-size: 0.9rem; line-height: 1.7;
+            white-space: pre-wrap; word-break: break-word;
+            color: var(--text); user-select: text; -webkit-user-select: text;
+        }
+        .inbox-reader-attach {
+            padding: 0 1.5rem 1.5rem;
+        }
+        .inbox-reader-attach h4 {
+            font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;
+        }
+        .inbox-reader-attach .att-item {
+            display: inline-block; padding: 0.3rem 0.6rem; margin: 0.2rem;
+            background: rgba(74,144,244,0.1); border-radius: 6px;
+            font-size: 0.75rem; color: var(--accent-blue);
+        }
+        .inbox-status {
+            padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 1rem;
+            font-size: 0.85rem; font-weight: 600;
+        }
+        .inbox-status.success { background: rgba(45,212,168,0.15); color: var(--accent-green); }
+        .inbox-status.error { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .inbox-status.loading { background: rgba(74,144,244,0.15); color: var(--accent-blue); }
+
+        /* ─── Account Form ────────────────────────────── */
+        .account-card {
+            background: var(--progress-bg); border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); padding: 0.75rem; margin-bottom: 0.5rem; position: relative;
+        }
+        .account-card .account-delete {
+            position: absolute; top: 0.5rem; right: 0.5rem;
+            background: none; border: none; cursor: pointer; color: var(--text-muted);
+            font-size: 1rem; opacity: 0.5; transition: opacity 0.15s;
+        }
+        .account-card .account-delete:hover { opacity: 1; color: #ef4444; }
+        .account-card .form-group { margin-bottom: 0.75rem; }
+        .account-card .form-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+        }
+        .account-card .form-group label {
+            display: block; font-size: 0.75rem; color: var(--text-muted);
+            margin-bottom: 0.2rem; font-weight: 600;
+        }
+        .account-card input[type="text"],
+        .account-card input[type="password"],
+        .account-card input[type="number"] {
+            width: 100%; padding: 0.35rem 0.5rem; border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text);
+            font-size: 0.78rem; font-family: inherit;
+        }
+        .account-card input:focus { outline: none; border-color: var(--accent-blue); }
+        .account-card .account-toggle {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 0.8rem; color: var(--text-muted); cursor: pointer;
+        }
+
+        /* ─── Graph Tab ───────────────────────────── */
+        #tab-graph { display: none; height: calc(100vh - 120px); }
+        #tab-graph.active { display: flex; gap: 0; }
+        .graph-sidebar {
+            width: 280px; min-width: 200px; display: flex; flex-direction: column;
+            border-right: 1px solid var(--card-border); background: var(--bg-surface);
+            border-radius: var(--radius-md) 0 0 var(--radius-md); overflow: hidden;
+        }
+        .graph-search { padding: 0.5rem; }
+        .graph-search input {
+            width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); background: var(--bg); color: var(--text);
+            font-size: 0.82rem; font-family: inherit;
+        }
+        .graph-search input:focus { outline: none; border-color: var(--accent-blue); }
+        .graph-search-results { font-size: 0.7rem; color: var(--text-muted); padding: 0 0.6rem 0.3rem; }
+        .graph-filters {
+            display: flex; gap: 0.6rem; padding: 0.25rem 0.6rem 0.5rem; flex-wrap: wrap;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .graph-filters label {
+            display: flex; align-items: center; gap: 0.3rem;
+            font-size: 0.75rem; color: var(--text-muted); cursor: pointer; white-space: nowrap;
+        }
+        .graph-filters input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--accent-blue); }
+        .graph-node-list { flex: 1; overflow-y: auto; padding: 0.25rem 0; }
+        .node-item {
+            padding: 0.3rem 0.6rem; font-size: 0.78rem; color: var(--text-muted);
+            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            border-left: 2px solid transparent; transition: background 0.1s;
+        }
+        .node-item:hover { background: var(--card-hover); color: var(--text); }
+        .node-item.active { background: var(--accent-blue-glow); color: var(--accent-blue); border-left-color: var(--accent-blue); }
+        .node-item .node-type-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; vertical-align: middle;
+        }
+        .graph-canvas-wrap { flex: 1; position: relative; background: var(--bg); border-radius: 0 var(--radius-md) var(--radius-md) 0; overflow: hidden; contain: strict; }
+        #graphSvg { width: 100%; height: 100%; display: block; overflow: hidden; }
+        #graphSvg.simulating line { shape-rendering: optimizeSpeed; }
+        .graph-placeholder {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 0.6rem;
+            color: var(--text-muted); pointer-events: none;
+        }
+        .graph-placeholder .gp-icon { font-size: 2.2rem; opacity: 0.3; }
+        .graph-placeholder .gp-text { font-size: 0.85rem; opacity: 0.6; }
+        .graph-placeholder .gp-hint { font-size: 0.72rem; opacity: 0.35; }
+        .graph-zoom-controls {
+            position: absolute; bottom: 0.75rem; right: 0.75rem;
+            display: flex; gap: 0.3rem; z-index: 10;
+        }
+        .graph-zoom-controls button {
+            width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+            background: var(--bg-surface); color: var(--text); cursor: pointer; font-size: 1rem;
+        }
+        .graph-zoom-controls button:hover { background: var(--card-hover); }
+        .graph-reader {
+            position: absolute; top: 0; right: 0; width: 380px; min-width: 260px; max-width: 85%; height: 100%;
+            background: var(--bg-surface); border-left: 1px solid var(--card-border);
+            transform: translateX(100%); transition: transform 0.2s ease; z-index: 20;
+            display: flex; flex-direction: column;
+        }
+        .graph-reader.open { transform: translateX(0); }
+        .graph-reader-resize {
+            position: absolute; top: 0; left: -4px; width: 8px; height: 100%;
+            cursor: col-resize; z-index: 25;
+        }
+        .graph-reader-resize:hover, .graph-reader-resize:active {
+            background: var(--accent-blue); opacity: 0.3;
+        }
+        .graph-reader-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--card-border);
+        }
+        .graph-reader-header h3 {
+            font-size: 0.85rem; font-weight: 600; color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+        }
+        .graph-reader-header button {
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            font-size: 1.1rem; padding: 0.2rem 0.4rem;
+        }
+        .graph-reader-header button:hover { color: var(--text); }
+        .graph-reader-body {
+            flex: 1; overflow-y: auto; padding: 0.8rem;
+            font-size: 0.8rem; line-height: 1.7; color: var(--text-muted);
+            white-space: pre-wrap; font-family: 'JetBrains Mono', monospace;
+            display: flex; flex-direction: column;
+        }
+        .graph-reader-body img {
+            max-width: 100%; height: auto; border-radius: var(--radius-sm);
+            background: var(--bg); object-fit: contain;
+        }
+        .graph-reader-body iframe {
+            width: 100%; flex: 1; min-height: 400px; border: none;
+            border-radius: var(--radius-sm); background: #fff;
+        }
+        .graph-reader-body .open-external-btn {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.5rem 1rem; margin: 1rem auto; border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--accent-blue);
+            cursor: pointer; font-size: 0.8rem; font-family: inherit; transition: background 0.15s;
+        }
+        .graph-reader-body .open-external-btn:hover { background: var(--card-hover); }
+        .graph-stats {
+            display: flex; gap: 1rem; padding: 0.25rem 0.6rem 0.4rem; font-size: 0.7rem; color: var(--text-muted);
+        }
 
         /* ─── Responsive ─────────────────────────────── */
         @media (max-width: 600px) {
@@ -388,16 +924,37 @@
             .tab-btn { font-size: 0.85rem; padding: 0.7rem 0.5rem; }
         }
     </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
 
+<!-- ─── Custom Titlebar ────────────────────────── -->
+<div class="titlebar" id="titlebar">
+    <span class="titlebar-icon"><img src="/logo.svg" alt="ISENAPP"></span>
+    <span class="titlebar-title">ISENAPP</span>
+    <div class="titlebar-controls">
+        <button class="titlebar-btn" id="btn-minimize" title="Réduire">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="titlebar-btn" id="btn-maximize" title="Agrandir">
+            <svg viewBox="0 0 24 24" id="maximize-icon"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+        </button>
+        <button class="titlebar-btn close" id="btn-close" title="Fermer">
+            <svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        </button>
+    </div>
+</div>
+
+<div class="app-content" id="app-content">
 <canvas id="confetti"></canvas>
 
 <div class="container">
     <!-- Tab Bar -->
     <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('todo')">📋 Todo</button>
-        <button class="tab-btn" onclick="switchTab('mail')">📧 Mail</button>
+        <button class="tab-btn active" onclick="switchTab('todo')"><i class="icon-list-checks"></i> Todo</button>
+        <button class="tab-btn" onclick="switchTab('inbox')"><i class="icon-inbox"></i> Inbox</button>
+        <button class="tab-btn" onclick="switchTab('mail')"><i class="icon-send"></i> Mail</button>
+        <button class="tab-btn" onclick="switchTab('graph')"><i class="icon-network"></i> Graph</button>
     </div>
 
     <!-- TODO TAB -->
@@ -405,11 +962,55 @@
         <div id="app"></div>
     </div>
 
+    <!-- INBOX TAB -->
+    <div class="tab-content" id="tab-inbox">
+        <header>
+            <h1><i class="icon-inbox"></i> Boîte de réception</h1>
+            <div class="header-actions">
+                <button onclick="fetchEmails()"><i class="icon-refresh-cw"></i> Relever les mails</button>
+                <button onclick="openAccountsModal()"><i class="icon-user"></i> Comptes</button>
+                <button onclick="toggleInboxFolder()" id="inboxFolderBtn"><i class="icon-inbox"></i> Reçus</button>
+                <button onclick="exportAllObsidian()"><i class="icon-book-open"></i> Exporter Obsidian</button>
+            </div>
+        </header>
+
+        <div id="inbox-status" style="display:none" class="inbox-status"></div>
+
+        <div class="inbox-layout">
+            <div class="inbox-list-panel" id="inboxListPanel">
+                <div class="inbox-search">
+                    <input type="text" id="inboxSearch" placeholder="Rechercher dans les mails…" oninput="filterInbox()">
+                </div>
+                <div class="inbox-filters">
+                    <button class="inbox-filter-btn active" onclick="setInboxFilter('all', this)">Tous</button>
+                    <button class="inbox-filter-btn" onclick="setInboxFilter('unread', this)">Non lus</button>
+                    <button class="inbox-filter-btn" onclick="setInboxFilter('starred', this)"><i class="icon-star"></i></button>
+                </div>
+                <div id="inboxList" class="inbox-list"></div>
+            </div>
+            <div class="inbox-reader-panel" id="inboxReaderPanel">
+                <div id="inboxReader" class="inbox-reader">
+                    <div class="inbox-reader-empty">
+                        <i class="icon-mail-open" style="font-size:2.5rem;color:var(--text-muted)"></i>
+                        <p>Sélectionne un mail pour le lire</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MAIL TAB -->
     <div class="tab-content" id="tab-mail">
-        <div id="mail-reminders"></div>
-        <div class="mail-composer">
-            <h2>📧 Rédiger un mail</h2>
+        <!-- Timeline -->
+        <div class="timeline-container" id="timeline-container"></div>
+
+        <!-- Pending Mail List -->
+        <div class="mail-pending-list" id="mail-pending-list"></div>
+
+        <!-- Mail Composer -->
+        <div class="mail-composer" id="mailComposer">
+            <div id="selectedTaskBanner"></div>
+            <h2><i class="icon-pen-line"></i> Rédiger un mail</h2>
             <div class="mail-field">
                 <label>Expéditeur</label>
                 <select id="mailFrom">
@@ -431,6 +1032,16 @@
                 </div>
             </div>
             <div class="mail-field">
+                <label>Cc</label>
+                <div class="autocomplete-wrapper">
+                    <div class="email-tags-container" id="mailCcTags" onclick="document.getElementById('mailCcInput').focus()">
+                        <input type="text" class="email-tags-input" id="mailCcInput" placeholder="Cc (optionnel)…" autocomplete="off"
+                            oninput="onCcContactInput()" onfocus="onCcContactInput()" onkeydown="onCcTagKeydown(event)">
+                    </div>
+                    <div class="autocomplete-list" id="ccContactList"></div>
+                </div>
+            </div>
+            <div class="mail-field">
                 <label>Sujet</label>
                 <input type="text" id="mailSubject" placeholder="Sujet du mail">
             </div>
@@ -438,23 +1049,75 @@
                 <label>Corps du message</label>
                 <textarea id="mailBody" placeholder="Rédigez votre mail ici…"></textarea>
             </div>
-            <div class="mail-actions">
-                <button class="accent-purple" onclick="reformulateMail()">🤖 Reformuler</button>
-                <button class="accent-green" onclick="saveMailEml()">💾 Enregistrer (.eml)</button>
-                <button class="accent-orange" onclick="openInThunderbird()">🐦 Ouvrir dans Thunderbird</button>
+            <div class="mail-field">
+                <label>Pièces jointes</label>
+                <div id="attachmentZone" style="border:1px dashed var(--card-border);border-radius:var(--radius-sm);padding:0.6rem;min-height:2.4rem;cursor:pointer;position:relative" onclick="document.getElementById('attachmentInput').click()">
+                    <input type="file" id="attachmentInput" multiple style="display:none" onchange="handleAttachmentFiles(this.files)">
+                    <div id="attachmentList" style="display:flex;flex-wrap:wrap;gap:0.4rem"></div>
+                    <p id="attachmentPlaceholder" style="color:var(--text-muted);font-size:0.78rem;margin:0;text-align:center">📎 Cliquer ou glisser des fichiers ici</p>
+                </div>
             </div>
+            <div class="mail-actions">
+                <button onclick="sendMailSMTP()" style="background:var(--accent-blue)!important;border-color:var(--accent-blue)!important;color:white!important"><i class="icon-send"></i> Envoyer</button>
+                <button class="accent-purple" onclick="reformulateMail()"><i class="icon-sparkles"></i> Reformuler</button>
+                <button class="accent-green" onclick="saveMailEml()"><i class="icon-save"></i> Enregistrer .eml</button>
+            </div>
+            <div class="mail-actions" id="mailSentActions" style="margin-top:0.5rem; display:none"></div>
         </div>
 
         <!-- v3.py execution -->
         <div class="mail-composer">
-            <h2>📬 Importer des mails (v3.py)</h2>
+            <h2><i class="icon-download"></i> Importer des mails (v3.py)</h2>
             <div class="mail-actions">
-                <button onclick="runV3()">▶️ Exécuter v3.py</button>
+                <button onclick="runV3()"><i class="icon-play"></i> Exécuter v3.py</button>
             </div>
             <div class="terminal-output" id="v3output" style="display:none"></div>
         </div>
     </div>
 </div>
+
+    <!-- GRAPH TAB -->
+    <div class="tab-content" id="tab-graph">
+        <div class="graph-sidebar">
+            <div class="graph-search">
+                <input type="text" id="graphSearchInput" placeholder="Rechercher notes, mails, fichiers…" oninput="filterGraphNodes(this.value)">
+            </div>
+            <div class="graph-search-results" id="graphSearchResults"></div>
+            <div class="graph-filters">
+                <label><input type="checkbox" checked data-group="md" onchange="toggleGraphGroup(this)"> <i class="icon-file-text"></i> Notes</label>
+                <label><input type="checkbox" checked data-group="mail" onchange="toggleGraphGroup(this)"> <i class="icon-mail"></i> Mails</label>
+                <label><input type="checkbox" checked data-group="attachment" onchange="toggleGraphGroup(this)"> <i class="icon-paperclip"></i> Fichiers</label>
+                <label><input type="checkbox" checked data-group="orphan" onchange="toggleGraphGroup(this)"> <i class="icon-circle-dashed"></i> Orphelins</label>
+            </div>
+            <div class="graph-stats" id="graphStats"></div>
+            <div class="graph-node-list" id="graphNodeList"></div>
+        </div>
+        <div class="graph-canvas-wrap">
+            <svg id="graphSvg"></svg>
+            <div class="graph-placeholder" id="graphPlaceholder">
+                <div class="gp-icon"><i class="icon-network"></i></div>
+                <div class="gp-text">Tapez une recherche pour afficher le graphe</div>
+                <div class="gp-hint">minimum 2 caractères</div>
+            </div>
+            <div class="graph-zoom-controls" id="graphZoomControls" style="display:none">
+                <button onclick="graphZoom(1.3)" title="Zoom in">+</button>
+                <button onclick="graphZoom(1/1.3)" title="Zoom out">−</button>
+                <button onclick="graphFit()" title="Fit">⊡</button>
+            </div>
+        </div>
+        <div class="graph-reader" id="graphReader">
+            <div class="graph-reader-resize" id="graphReaderResize"></div>
+            <div class="graph-reader-header">
+                <h3 id="graphReaderTitle">—</h3>
+                <button onclick="toggleGraphReaderExpand()" title="Agrandir / Réduire">⇱</button>
+                <button onclick="closeGraphReader()">✕</button>
+            </div>
+            <div class="graph-reader-body" id="graphReaderBody"></div>
+        </div>
+    </div>
+
+</div><!-- end .container -->
+</div><!-- end .app-content -->
 
 <!-- Section Modal -->
 <div class="modal-overlay" id="sectionModal" onclick="if(event.target===this)closeSectionModal()">
@@ -490,11 +1153,21 @@
 <!-- Settings Modal -->
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettings()">
     <div class="modal">
-        <h2>⚙️ Paramètres</h2>
+        <h2><i class="icon-settings"></i> Paramètres</h2>
         <div class="form-group">
             <label>Clé API Gemini</label>
             <input type="password" id="geminiKeyInput" placeholder="AIza...">
             <small>Nécessaire pour « Reformuler ». Stockée dans data.json.</small>
+        </div>
+        <hr style="border-color:var(--card-border);margin:1rem 0">
+        <div class="form-group">
+            <label>📇 Importer un annuaire de contacts (CSV)</label>
+            <small style="display:block;margin-bottom:0.4rem;color:var(--text-muted)">Fichier CSV avec colonnes : Display Name, First Name, Last Name, Primary Email</small>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <input type="file" id="contactsCsvInput" accept=".csv" style="font-size:0.8rem;color:var(--text)">
+                <button onclick="importContactsCsv()" style="white-space:nowrap;padding:0.35rem 0.8rem;background:var(--accent-green);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.78rem">📥 Importer</button>
+            </div>
+            <small id="contactsCount" style="color:var(--text-muted);margin-top:0.3rem;display:block"></small>
         </div>
         <div class="modal-actions">
             <button onclick="closeSettings()">Annuler</button>
@@ -506,7 +1179,7 @@
 <!-- Reminder Modal -->
 <div class="modal-overlay" id="reminderModal" onclick="if(event.target===this)closeReminderModal()">
     <div class="modal" style="max-width:600px">
-        <h2 id="reminderModalTitle">📧 Relance générée par IA</h2>
+        <h2 id="reminderModalTitle"><i class="icon-sparkles"></i> Relance générée par IA</h2>
         <div class="mail-field">
             <label>Destinataire</label>
             <input type="text" id="reminderTo" readonly>
@@ -521,8 +1194,43 @@
         </div>
         <div class="modal-actions">
             <button onclick="closeReminderModal()">Annuler</button>
-            <button class="accent-green" onclick="saveReminderEml()">💾 Enregistrer (.eml)</button>
-            <button class="accent-orange" onclick="sendReminderThunderbird()">🐦 Thunderbird</button>
+            <button class="accent-purple" onclick="reformulateReminder()"><i class="icon-sparkles"></i> Reformuler</button>
+            <button class="accent-green" onclick="saveReminderEml()"><i class="icon-save"></i> .eml</button>
+            <button style="background:var(--accent-blue)!important;border-color:var(--accent-blue)!important;color:white!important" onclick="sendReminderSMTP()"><i class="icon-send"></i> Envoyer</button>
+        </div>
+        <div class="modal-actions" style="margin-top:0.5rem;">
+            <button class="btn-sent-confirm" onclick="confirmReminderSent()"><i class="icon-check"></i> Rappel envoyé</button>
+            <button class="btn-response-received" onclick="confirmReminderResponseReceived()"><i class="icon-mail-check"></i> Réponse reçue</button>
+        </div>
+    </div>
+</div>
+
+<!-- Accounts Modal -->
+<div class="modal-overlay" id="accountsModal" onclick="if(event.target===this)closeAccountsModal()">
+    <div class="modal" style="max-width:650px">
+        <h2><i class="icon-user"></i> Comptes mail (POP3 / IMAP / SMTP)</h2>
+        <div id="accountsList"></div>
+        <button class="add-task-btn" onclick="addAccountForm()" style="margin-bottom:1rem">+ Ajouter un compte</button>
+        <div class="modal-actions">
+            <button onclick="closeAccountsModal()">Annuler</button>
+            <button class="btn-primary" onclick="saveAccountsFromModal()"><i class="icon-save"></i> Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="deleteMailModal" onclick="if(event.target===this)closeDeleteMailModal()">
+    <div class="modal" style="max-width:400px">
+        <h2><i class="icon-trash-2"></i> Supprimer ce mail ?</h2>
+        <p style="color:var(--text-muted);margin-bottom:1rem" id="deleteMailSubject"></p>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="deleteOnServer"> Supprimer aussi sur le serveur distant
+            </label>
+        </div>
+        <div class="modal-actions">
+            <button onclick="closeDeleteMailModal()">Annuler</button>
+            <button class="btn-danger" onclick="confirmDeleteMail()"><i class="icon-trash-2"></i> Supprimer</button>
         </div>
     </div>
 </div>
@@ -540,13 +1248,15 @@
 /* ═══════════════════════════════════════════════════════
    State & Config
    ═══════════════════════════════════════════════════════ */
-let state = { sections: [], settings: { geminiKey: '' }, reminders: [] };
+let state = { sections: [], settings: { geminiKey: '' }, reminders: [], mailEvents: [] };
 let editMode = false;
 let editingSectionId = null;
 let dragData = null;
 let contacts = [];
 let currentTab = 'todo';
 let currentReminder = null;
+let selectedMailTask = null;
+let timelineMonth = new Date();
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => String(s)
@@ -576,11 +1286,18 @@ let modalColor = 'blue';
 function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach((b, i) => {
-        b.classList.toggle('active', (i === 0 && tab === 'todo') || (i === 1 && tab === 'mail'));
+        b.classList.toggle('active',
+            (i === 0 && tab === 'todo') ||
+            (i === 1 && tab === 'inbox') ||
+            (i === 2 && tab === 'mail') ||
+            (i === 3 && tab === 'graph')
+        );
     });
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
-    if (tab === 'mail') renderReminders();
+    if (tab === 'mail') renderMailTab();
+    if (tab === 'inbox') loadInbox();
+    if (tab === 'graph') initGraphIfNeeded();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -604,6 +1321,17 @@ async function loadState() {
     if (!state.sections) state.sections = [];
     if (!state.settings) state.settings = { geminiKey: '' };
     if (!state.reminders) state.reminders = [];
+    if (!state.mailEvents) state.mailEvents = [];
+    // Migration: convert old isMail flag to type field, old dismissed to status
+    state.sections.forEach(s => {
+        s.tasks.forEach(t => {
+            if (!t.type) t.type = t.isMail ? 'mail' : 'task';
+        });
+    });
+    state.reminders.forEach(r => {
+        if (!r.status) r.status = r.dismissed ? 'dismissed' : 'pending';
+        if (!r.cycle) r.cycle = 1;
+    });
 }
 
 async function loadContacts() {
@@ -644,12 +1372,12 @@ function render() {
 function renderHeader() {
     return `
     <header>
-        <h1>📋 Plan d'action</h1>
+        <h1><i class="icon-list-checks"></i> Plan d'action</h1>
         <div class="header-actions">
             <button onclick="toggleEdit()" class="${editMode ? 'active' : ''}">
-                ${editMode ? '✅ Terminer' : '✏️ Éditer'}
+                ${editMode ? '<i class="icon-check"></i> Terminer' : '<i class="icon-pencil"></i> Éditer'}
             </button>
-            <button onclick="openSettings()">⚙️</button>
+            <button onclick="openSettings()"><i class="icon-settings"></i></button>
         </div>
     </header>`;
 }
@@ -672,14 +1400,17 @@ function renderSections() {
     return state.sections.map(s => {
         const tasksHtml = s.tasks.map(t => renderTask(t, s.id)).join('');
         const editBtns = editMode ? `
-            <button class="btn-icon" onclick="event.stopPropagation();openSectionModal('${s.id}')" title="Modifier">✏️</button>
-            <button class="btn-icon" onclick="event.stopPropagation();deleteSection('${s.id}')" title="Supprimer">🗑️</button>
+            <button class="btn-icon" onclick="event.stopPropagation();openSectionModal('${s.id}')" title="Modifier"><i class="icon-pencil"></i></button>
+            <button class="btn-icon" onclick="event.stopPropagation();deleteSection('${s.id}')" title="Supprimer"><i class="icon-trash-2"></i></button>
         ` : '';
         const desc = s.description
             ? `<p class="section-desc" data-desc="${s.id}" ${s.collapsed ? 'style="display:none"' : ''}>${esc(s.description)}</p>`
             : '';
-        const addBtn = editMode
-            ? `<button class="add-task-btn" onclick="addTask('${s.id}')">+ Nouvelle tâche</button>`
+        const addBtns = editMode
+            ? `<div class="add-task-buttons">
+                <button onclick="addTask('${s.id}','task')">+ Tâche</button>
+                <button class="mail-btn" onclick="addTask('${s.id}','mail')"><i class="icon-mail"></i> + Mail</button>
+               </div>`
             : '';
         return `
         <div class="section" data-color="${esc(s.color)}" data-sid="${s.id}">
@@ -699,7 +1430,7 @@ function renderSections() {
             ${desc}
             <div class="task-list" data-slist="${s.id}" ${s.collapsed ? 'style="display:none"' : ''}>
                 ${tasksHtml}
-                ${addBtn}
+                ${addBtns}
             </div>
         </div>`;
     }).join('');
@@ -710,14 +1441,16 @@ function renderTask(t, sid) {
         'task-item',
         t.done ? 'checked' : '',
         t.indent ? 'sub-task' : '',
-        t.isMail ? 'is-mail' : ''
+        (t.type === 'mail' || t.isMail) ? 'is-mail' : ''
     ].filter(Boolean).join(' ');
 
     const check = `<div class="custom-check" onclick="toggleTask('${sid}','${t.id}')">
         <svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div>`;
 
     if (editMode) {
-        const mailFlagCls = t.isMail ? 'mail-flag active' : 'mail-flag';
+        const typeBadge = (t.type === 'mail' || t.isMail)
+            ? '<span class="task-type-badge"><i class="icon-mail"></i> Mail</span>'
+            : '';
         return `
         <div class="${cls}" data-sid="${sid}" data-tid="${t.id}" draggable="true">
             ${check}
@@ -731,9 +1464,9 @@ function renderTask(t, sid) {
                     onkeydown="if(event.key==='Enter'){this.blur()}">
             </div>
             <div class="edit-actions">
-                <span class="${mailFlagCls}" onclick="toggleMailFlag('${sid}','${t.id}')" title="Marquer comme mail à envoyer">📧</span>
+                ${typeBadge}
                 <button class="btn-icon" onclick="toggleIndent('${sid}','${t.id}')" title="Indenter / Désindenter">↔</button>
-                <button class="btn-icon" onclick="deleteTask('${sid}','${t.id}')" title="Supprimer">🗑️</button>
+                <button class="btn-icon" onclick="deleteTask('${sid}','${t.id}')" title="Supprimer"><i class="icon-trash-2"></i></button>
             </div>
         </div>`;
     }
@@ -783,34 +1516,20 @@ function toggleTask(sid, tid) {
     if (!t) return;
     t.done = !t.done;
 
-    // If marking a mail-task as done, create a reminder for 3 days later
-    if (t.done && t.isMail) {
-        const now = Date.now();
-        const remindAt = now + 3 * 24 * 60 * 60 * 1000; // 3 days
-        state.reminders = state.reminders || [];
-        state.reminders.push({
-            id: uid(),
-            taskId: tid,
-            sectionId: sid,
-            label: t.label,
-            note: t.note || '',
-            mailTo: t.mailTo || '',
-            mailSubject: t.mailSubject || t.label,
-            mailBody: t.mailBody || '',
-            createdAt: now,
-            remindAt: remindAt,
-            dismissed: false
-        });
-    }
-    // If unchecking a mail-task, remove its pending reminder
-    if (!t.done && t.isMail && state.reminders) {
-        state.reminders = state.reminders.filter(r => r.taskId !== tid || r.dismissed);
+    // For mail tasks, sync with sent status
+    if (t.type === 'mail' || t.isMail) {
+        if (t.done && !t.sentAt) {
+            markMailTaskSent(sid, tid);
+        } else if (!t.done && t.sentAt) {
+            unmarkMailTaskSent(sid, tid);
+        }
     }
 
     const el = document.querySelector(`[data-sid="${sid}"][data-tid="${tid}"]`);
     if (el) el.classList.toggle('checked', t.done);
     updateProgress();
     autoSave();
+    if (currentTab === 'mail') renderMailTab();
 }
 
 function updateTask(sid, tid, field, value) {
@@ -822,10 +1541,16 @@ function updateTask(sid, tid, field, value) {
     autoSave();
 }
 
-function addTask(sid) {
+function addTask(sid, type) {
+    type = type || 'task';
     const s = state.sections.find(x => x.id === sid);
     if (!s) return;
-    s.tasks.push({ id: uid(), label: '', note: '', done: false, indent: 0, isMail: false });
+    s.tasks.push({
+        id: uid(), label: '', note: '', done: false, indent: 0,
+        type: type, isMail: type === 'mail',
+        mailTo: '', mailFrom: '', mailSubject: '', mailBody: '',
+        sentAt: null, respondedAt: null
+    });
     render();
     autoSave();
     const inputs = document.querySelectorAll(`[data-sid="${sid}"] .task-input`);
@@ -846,16 +1571,6 @@ function toggleIndent(sid, tid) {
     const t = s.tasks.find(x => x.id === tid);
     if (!t) return;
     t.indent = t.indent ? 0 : 1;
-    render();
-    autoSave();
-}
-
-function toggleMailFlag(sid, tid) {
-    const s = state.sections.find(x => x.id === sid);
-    if (!s) return;
-    const t = s.tasks.find(x => x.id === tid);
-    if (!t) return;
-    t.isMail = !t.isMail;
     render();
     autoSave();
 }
@@ -1014,6 +1729,7 @@ function saveSectionModal() {
    ═══════════════════════════════════════════════════════ */
 function openSettings() {
     document.getElementById('geminiKeyInput').value = state.settings.geminiKey || '';
+    document.getElementById('contactsCount').textContent = contacts.length ? `${contacts.length} contacts chargés` : '';
     document.getElementById('settingsModal').classList.add('show');
 }
 
@@ -1028,10 +1744,42 @@ function saveSettings() {
     showToast('Paramètres sauvegardés', 'success');
 }
 
+async function importContactsCsv() {
+    const input = document.getElementById('contactsCsvInput');
+    if (!input.files.length) {
+        showToast('Sélectionne un fichier CSV.', 'error');
+        return;
+    }
+    const file = input.files[0];
+    const csvText = await file.text();
+    showLoading('Import de l\u2019annuaire\u2026');
+    try {
+        const r = await fetch('/api/contacts/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv: csvText })
+        });
+        const result = await r.json();
+        if (result.ok) {
+            showToast(`Annuaire importé : ${result.count} contacts`, 'success', 3000);
+            await loadContacts();
+            document.getElementById('contactsCount').textContent = `${contacts.length} contacts chargés`;
+            input.value = '';
+        } else {
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
 /* ═══════════════════════════════════════════════════════
    Contact Autocomplete (multi-recipient)
    ═══════════════════════════════════════════════════════ */
 let mailRecipients = [];
+let mailCcRecipients = [];
 
 function renderMailTags() {
     const container = document.getElementById('mailToTags');
@@ -1047,6 +1795,20 @@ function renderMailTags() {
     });
 }
 
+function renderCcTags() {
+    const container = document.getElementById('mailCcTags');
+    const input = document.getElementById('mailCcInput');
+    container.querySelectorAll('.email-tag').forEach(t => t.remove());
+    mailCcRecipients.forEach((email, i) => {
+        const tag = document.createElement('span');
+        tag.className = 'email-tag';
+        const c = contacts.find(c => c.email === email);
+        tag.innerHTML = `${esc(c ? c.name : email)}<span class="tag-remove" onclick="removeCcRecipient(${i})">&times;</span>`;
+        tag.title = email;
+        container.insertBefore(tag, input);
+    });
+}
+
 function addRecipient(email) {
     email = email.trim();
     if (!email || mailRecipients.includes(email)) return;
@@ -1057,13 +1819,32 @@ function addRecipient(email) {
     document.getElementById('contactList').classList.remove('show');
 }
 
+function addCcRecipient(email) {
+    email = email.trim();
+    if (!email || mailCcRecipients.includes(email)) return;
+    mailCcRecipients.push(email);
+    renderCcTags();
+    const input = document.getElementById('mailCcInput');
+    input.value = '';
+    document.getElementById('ccContactList').classList.remove('show');
+}
+
 function removeRecipient(index) {
     mailRecipients.splice(index, 1);
     renderMailTags();
 }
 
+function removeCcRecipient(index) {
+    mailCcRecipients.splice(index, 1);
+    renderCcTags();
+}
+
 function getMailToValue() {
     return mailRecipients.join(', ');
+}
+
+function getMailCcValue() {
+    return mailCcRecipients.join(', ');
 }
 
 function onContactInput() {
@@ -1089,6 +1870,10 @@ function selectContact(email) {
     addRecipient(email);
 }
 
+function selectCcContact(email) {
+    addCcRecipient(email);
+}
+
 function onTagKeydown(e) {
     const input = document.getElementById('mailToInput');
     if ((e.key === 'Enter' || e.key === ',' || e.key === 'Tab') && input.value.trim()) {
@@ -1100,11 +1885,44 @@ function onTagKeydown(e) {
     }
 }
 
+function onCcContactInput() {
+    const input = document.getElementById('mailCcInput');
+    const list = document.getElementById('ccContactList');
+    const val = input.value.toLowerCase().trim();
+    if (!val || val.length < 1) { list.classList.remove('show'); return; }
+    const allUsed = [...mailRecipients, ...mailCcRecipients];
+    const matches = contacts.filter(c =>
+        !allUsed.includes(c.email) &&
+        (c.name.toLowerCase().includes(val) || c.email.toLowerCase().includes(val))
+    ).slice(0, 10);
+    if (!matches.length) { list.classList.remove('show'); return; }
+    list.innerHTML = matches.map(c =>
+        `<div class="autocomplete-item" onclick="selectCcContact('${esc(c.email)}')">
+            <span class="ac-name">${esc(c.name)}</span>
+            <span class="ac-email">${esc(c.email)}</span>
+        </div>`
+    ).join('');
+    list.classList.add('show');
+}
+
+function onCcTagKeydown(e) {
+    const input = document.getElementById('mailCcInput');
+    if ((e.key === 'Enter' || e.key === ',' || e.key === 'Tab') && input.value.trim()) {
+        e.preventDefault();
+        addCcRecipient(input.value.replace(/,/g, '').trim());
+    }
+    if (e.key === 'Backspace' && !input.value && mailCcRecipients.length) {
+        removeCcRecipient(mailCcRecipients.length - 1);
+    }
+}
+
 // Close autocomplete on outside click
 document.addEventListener('click', e => {
     if (!e.target.closest('.autocomplete-wrapper')) {
         const list = document.getElementById('contactList');
         if (list) list.classList.remove('show');
+        const ccList = document.getElementById('ccContactList');
+        if (ccList) ccList.classList.remove('show');
     }
 });
 
@@ -1115,7 +1933,7 @@ async function reformulateMail() {
     const body = document.getElementById('mailBody').value.trim();
     if (!body) { showToast('Écris un message d\'abord.', 'error'); return; }
     if (!state.settings.geminiKey) {
-        showToast('Configure ta clé API Gemini dans ⚙️', 'error', 3000);
+        showToast('Configure ta clé API Gemini dans les paramètres', 'error', 3000);
         openSettings();
         return;
     }
@@ -1163,28 +1981,7 @@ async function saveMailEml() {
     }
 }
 
-async function openInThunderbird() {
-    const from = document.getElementById('mailFrom').value;
-    const to = getMailToValue();
-    const subject = document.getElementById('mailSubject').value.trim();
-    const body = document.getElementById('mailBody').value.trim();
-    if (!to || !subject) { showToast('Remplis le(s) destinataire(s) et le sujet.', 'error'); return; }
-    try {
-        const r = await fetch('/api/open-thunderbird', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from, to, subject, body })
-        });
-        const result = await r.json();
-        if (result.ok) {
-            showToast('Thunderbird ouvert !', 'success');
-        } else {
-            showToast('Erreur : ' + (result.error || 'Échec'), 'error', 5000);
-        }
-    } catch (e) {
-        showToast('Erreur : ' + e.message, 'error', 5000);
-    }
-}
+/* openInThunderbird removed — all sending goes through SMTP */
 
 /* ═══════════════════════════════════════════════════════
    Run v3.py
@@ -1197,53 +1994,501 @@ async function runV3() {
         const r = await fetch('/api/run-v3', { method: 'POST' });
         const result = await r.json();
         if (result.ok) {
-            outEl.textContent = result.output || '✅ Terminé (aucune sortie)';
+            outEl.textContent = result.output || 'Terminé (aucune sortie)';
             showToast('v3.py exécuté avec succès !', 'success');
         } else {
-            outEl.textContent = '❌ Erreur :\n' + (result.error || result.output || 'Erreur inconnue');
+            outEl.textContent = 'Erreur :\n' + (result.error || result.output || 'Erreur inconnue');
             showToast('Erreur v3.py', 'error', 3000);
         }
     } catch (e) {
-        outEl.textContent = '❌ Erreur réseau : ' + e.message;
+        outEl.textContent = 'Erreur réseau : ' + e.message;
         showToast('Erreur : ' + e.message, 'error', 5000);
     }
 }
 
 /* ═══════════════════════════════════════════════════════
-   Reminders (3-day follow-up for mail tasks)
+   Mail Tab — Helpers
    ═══════════════════════════════════════════════════════ */
-function renderReminders() {
-    const container = document.getElementById('mail-reminders');
+function getAllMailTasks() {
+    const mails = [];
+    state.sections.forEach(s => {
+        s.tasks.forEach(t => {
+            if (t.type === 'mail' || t.isMail) {
+                mails.push({ ...t, sectionId: s.id, sectionTitle: s.title, sectionEmoji: s.emoji });
+            }
+        });
+    });
+    return mails;
+}
+
+function getMailTaskStatus(t) {
+    if (t.respondedAt) return 'responded';
+    if (t.sentAt) {
+        const hasActiveReminder = (state.reminders || []).some(r =>
+            r.taskId === t.id && r.status === 'pending'
+        );
+        return hasActiveReminder ? 'waiting' : 'sent';
+    }
+    return 'pending';
+}
+
+function getMailStatusLabel(status) {
+    switch(status) {
+        case 'pending': return 'À envoyer';
+        case 'sent': return 'Envoyé';
+        case 'waiting': return 'En attente';
+        case 'responded': return 'Répondu';
+        default: return '';
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mail Tab — Main Render
+   ═══════════════════════════════════════════════════════ */
+function renderMailTab() {
+    renderTimeline();
+    renderMailList();
+    updateMailComposerState();
+    updateMailBadge();
+}
+
+function renderMailList() {
+    const container = document.getElementById('mail-pending-list');
     if (!container) return;
-    const now = Date.now();
-    const due = (state.reminders || []).filter(r => !r.dismissed && r.remindAt <= now);
-    if (!due.length) { container.innerHTML = ''; return; }
-    container.innerHTML = due.map(r => `
-        <div class="reminder-banner">
-            <span class="reminder-text">
-                ⏰ <strong>Rappel :</strong> « ${esc(r.label)} » envoyé il y a 3 jours — pas de réponse ?
-            </span>
-            <button onclick="generateReminder('${r.id}')">🤖 Générer relance IA</button>
-            <button class="btn-dismiss" onclick="dismissReminder('${r.id}')">✖ Ignorer</button>
-        </div>
-    `).join('');
+    const mails = getAllMailTasks();
+
+    if (!mails.length) {
+        container.innerHTML = `
+            <h2><i class="icon-mail"></i> Mails à traiter</h2>
+            <div class="mail-pending-empty">
+                Aucun mail à traiter. Crée un mail depuis l'onglet Todo<br>(mode édition → <strong><i class="icon-mail"></i> + Mail</strong>).
+            </div>`;
+        return;
+    }
+
+    const pending = mails.filter(m => !m.sentAt && !m.respondedAt);
+    const waiting = mails.filter(m => m.sentAt && !m.respondedAt);
+    const responded = mails.filter(m => m.respondedAt);
+
+    let html = '<h2><i class="icon-mail"></i> Mails à traiter</h2>';
+    if (pending.length) html += renderMailGroup('À envoyer', pending);
+    if (waiting.length) html += renderMailGroup('En attente de réponse', waiting);
+    if (responded.length) html += renderMailGroup('Terminés', responded);
+
+    container.innerHTML = html;
 }
 
-function dismissReminder(rid) {
-    const r = (state.reminders || []).find(x => x.id === rid);
-    if (r) r.dismissed = true;
+function renderMailGroup(title, mails) {
+    let html = `<div class="mail-group-label">${esc(title)}</div>`;
+    html += mails.map(m => {
+        const status = getMailTaskStatus(m);
+        const statusLabel = getMailStatusLabel(status);
+        const isSelected = selectedMailTask && selectedMailTask.tid === m.id;
+        const cls = ['mail-item', isSelected ? 'selected' : '', m.sentAt ? 'is-sent' : ''].filter(Boolean).join(' ');
+        const checkDone = m.sentAt ? 'done' : '';
+
+        let actionsHtml = '';
+        if (status === 'sent' || status === 'waiting') {
+            actionsHtml += `<button onclick="event.stopPropagation();markResponseReceived('${m.sectionId}','${m.id}')" title="Réponse reçue"><i class="icon-check"></i></button>`;
+        }
+
+        return `
+        <div class="${cls}" onclick="selectMailForCompose('${m.sectionId}','${m.id}')">
+            <div class="mail-item-check ${checkDone}" onclick="event.stopPropagation();toggleMailSentFromList('${m.sectionId}','${m.id}')">
+                <svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg>
+            </div>
+            <div class="mail-item-info">
+                <div class="mail-item-label">${m.sectionEmoji} ${esc(m.label || 'Sans titre')}</div>
+                <div class="mail-item-section">${esc(m.sectionTitle)}${m.mailTo ? ' → ' + esc(m.mailTo) : ''}</div>
+            </div>
+            <span class="mail-item-status ${status}">${statusLabel}</span>
+            <div class="mail-item-actions">${actionsHtml}</div>
+        </div>`;
+    }).join('');
+    return html;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mail Tab — Composer Integration
+   ═══════════════════════════════════════════════════════ */
+function selectMailForCompose(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t) return;
+
+    selectedMailTask = { sid, tid };
+
+    mailRecipients = t.mailTo ? t.mailTo.split(',').map(e => e.trim()).filter(Boolean) : [];
+    renderMailTags();
+    document.getElementById('mailSubject').value = t.mailSubject || t.label || '';
+    document.getElementById('mailBody').value = t.mailBody || '';
+    if (t.mailFrom) {
+        const sel = document.getElementById('mailFrom');
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === t.mailFrom) { sel.selectedIndex = i; break; }
+        }
+    }
+
+    updateMailComposerState();
+    renderMailList();
+    document.getElementById('mailComposer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function deselectMailTask() {
+    selectedMailTask = null;
+    mailRecipients = [];
+    mailCcRecipients = [];
+    renderMailTags();
+    renderCcTags();
+    document.getElementById('mailSubject').value = '';
+    document.getElementById('mailBody').value = '';
+    updateMailComposerState();
+    renderMailList();
+}
+
+function updateMailComposerState() {
+    const composer = document.getElementById('mailComposer');
+    const banner = document.getElementById('selectedTaskBanner');
+    const sentActions = document.getElementById('mailSentActions');
+    if (!composer || !banner) return;
+
+    if (selectedMailTask) {
+        const s = state.sections.find(x => x.id === selectedMailTask.sid);
+        const t = s ? s.tasks.find(x => x.id === selectedMailTask.tid) : null;
+        if (t) {
+            composer.classList.add('has-selection');
+            const status = getMailTaskStatus(t);
+            banner.innerHTML = `
+                <div class="selected-task-banner">
+                    <span><i class="icon-mail"></i> <strong>${esc(t.label || 'Sans titre')}</strong></span>
+                    ${status !== 'pending' ? `<span class="mail-item-status ${status}" style="margin-left:0.5rem">${getMailStatusLabel(status)}</span>` : ''}
+                    <button class="deselect-btn" onclick="deselectMailTask()">✕</button>
+                </div>`;
+            if (sentActions) {
+                if (!t.sentAt) {
+                    sentActions.style.display = '';
+                    sentActions.innerHTML = `<button class="btn-sent-confirm" onclick="markCurrentMailSent()"><i class="icon-check"></i> Marquer comme envoyé</button>`;
+                } else if (!t.respondedAt) {
+                    sentActions.style.display = '';
+                    sentActions.innerHTML = `<button class="btn-response-received" onclick="markCurrentResponseReceived()"><i class="icon-mail-check"></i> Réponse reçue</button>`;
+                } else {
+                    sentActions.style.display = 'none';
+                }
+            }
+            return;
+        }
+    }
+
+    composer.classList.remove('has-selection');
+    banner.innerHTML = '';
+    if (sentActions) sentActions.style.display = 'none';
+}
+
+function saveMailFieldsToTask() {
+    if (!selectedMailTask) return;
+    const s = state.sections.find(x => x.id === selectedMailTask.sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === selectedMailTask.tid);
+    if (!t) return;
+    t.mailTo = getMailToValue();
+    t.mailFrom = document.getElementById('mailFrom').value;
+    t.mailSubject = document.getElementById('mailSubject').value.trim();
+    t.mailBody = document.getElementById('mailBody').value.trim();
+    if (!t.label && t.mailSubject) t.label = t.mailSubject;
     autoSave();
-    renderReminders();
 }
 
-async function generateReminder(rid) {
+function markCurrentMailSent() {
+    if (!selectedMailTask) return;
+    saveMailFieldsToTask();
+    markMailTaskSent(selectedMailTask.sid, selectedMailTask.tid);
+    autoSave();
+    renderMailTab();
+    render();
+    showToast('Mail marqué comme envoyé ! Rappel dans 3 jours.', 'success', 3000);
+}
+
+function markCurrentResponseReceived() {
+    if (!selectedMailTask) return;
+    markResponseReceived(selectedMailTask.sid, selectedMailTask.tid);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mail Sent / Response Tracking
+   ═══════════════════════════════════════════════════════ */
+function markMailTaskSent(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t || t.sentAt) return;
+
+    const now = Date.now();
+    t.sentAt = now;
+    t.done = true;
+
+    state.mailEvents = state.mailEvents || [];
+    state.mailEvents.push({
+        id: uid(), taskId: tid, sectionId: sid,
+        type: 'sent', date: now,
+        label: t.mailSubject || t.label, to: t.mailTo
+    });
+
+    state.reminders = state.reminders || [];
+    state.reminders.push({
+        id: uid(), taskId: tid, sectionId: sid,
+        label: t.mailSubject || t.label,
+        mailTo: t.mailTo || '', mailSubject: t.mailSubject || t.label,
+        mailBody: t.mailBody || '', mailFrom: t.mailFrom || '',
+        createdAt: now,
+        remindAt: now + 3 * 24 * 60 * 60 * 1000,
+        cycle: 1, status: 'pending'
+    });
+}
+
+function unmarkMailTaskSent(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t) return;
+    t.sentAt = null;
+    t.respondedAt = null;
+    state.mailEvents = (state.mailEvents || []).filter(e => e.taskId !== tid);
+    state.reminders = (state.reminders || []).filter(r => r.taskId !== tid || r.status === 'sent');
+}
+
+function markResponseReceived(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t) return;
+
+    const now = Date.now();
+    t.respondedAt = now;
+
+    state.mailEvents = state.mailEvents || [];
+    state.mailEvents.push({
+        id: uid(), taskId: tid, sectionId: sid,
+        type: 'response', date: now, label: t.mailSubject || t.label
+    });
+
+    (state.reminders || []).forEach(r => {
+        if (r.taskId === tid && r.status === 'pending') r.status = 'responded';
+    });
+
+    autoSave();
+    if (currentTab === 'mail') renderMailTab();
+    showToast('Réponse reçue ! Rappels annulés.', 'success');
+}
+
+function toggleMailSentFromList(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t) return;
+
+    if (!t.sentAt) {
+        if (!t.mailSubject && !t.label) {
+            selectMailForCompose(sid, tid);
+            showToast('Remplis d\'abord les détails du mail.', 'error');
+            return;
+        }
+        markMailTaskSent(sid, tid);
+        showToast('Mail marqué comme envoyé !', 'success');
+    } else {
+        unmarkMailTaskSent(sid, tid);
+        t.done = false;
+        showToast('Envoi annulé.', 'success');
+    }
+
+    autoSave();
+    render();
+    renderMailTab();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Timeline
+   ═══════════════════════════════════════════════════════ */
+function renderTimeline() {
+    const container = document.getElementById('timeline-container');
+    if (!container) return;
+
+    const now = new Date();
+    const year = timelineMonth.getFullYear();
+    const month = timelineMonth.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthName = timelineMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+    const events = getTimelineEvents(year, month);
+
+    let html = `
+        <div class="timeline-header">
+            <h2><i class="icon-calendar"></i> ${esc(monthName.charAt(0).toUpperCase() + monthName.slice(1))}</h2>
+            <div class="timeline-nav">
+                <button onclick="navigateTimeline(-1)">◀</button>
+                <button onclick="navigateTimeline(0)">Aujourd'hui</button>
+                <button onclick="navigateTimeline(1)">▶</button>
+            </div>
+        </div>
+        <div class="timeline-scroll">
+            <div class="timeline-track">
+                <div class="timeline-line"></div>`;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(year, month, d);
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isToday = (d === now.getDate() && month === now.getMonth() && year === now.getFullYear());
+        const dayEvents = events.filter(e => e.dateStr === dateStr);
+        const dayName = date.toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 2);
+
+        const colClass = isToday ? 'timeline-day timeline-today-col' : 'timeline-day';
+        html += `<div class="${colClass}" data-date="${dateStr}">`;
+        html += `<div class="timeline-day-label">${dayName}<br>${d}</div>`;
+
+        if (dayEvents.length > 0) {
+            const order = { 'reminder-due': 0, 'sent': 1, 'reminder-sent': 2, 'reminder-pending': 3, 'response': 4 };
+            const sorted = [...dayEvents].sort((a, b) => (order[a.dotClass] || 5) - (order[b.dotClass] || 5));
+            const primary = sorted[0];
+            html += `<div class="timeline-dot ${primary.dotClass}"
+                onclick="showTimelinePopover(event, '${dateStr}')"
+                title="${esc(primary.tooltip)}"></div>`;
+            html += `<div class="timeline-event-label">${dayEvents.length > 1 ? dayEvents.length + ' évén.' : esc(primary.shortLabel)}</div>`;
+        } else if (isToday) {
+            html += `<div class="timeline-dot today-marker"></div>`;
+            html += `<div class="timeline-event-label">Auj.</div>`;
+        } else {
+            html += `<div class="timeline-dot empty"></div>`;
+        }
+
+        html += '</div>';
+    }
+
+    html += `</div></div>`;
+    container.innerHTML = html;
+
+    if (month === now.getMonth() && year === now.getFullYear()) {
+        const todayCol = container.querySelector('.timeline-today-col');
+        if (todayCol) {
+            const scroll = container.querySelector('.timeline-scroll');
+            scroll.scrollLeft = todayCol.offsetLeft - scroll.clientWidth / 2;
+        }
+    }
+}
+
+function getTimelineEvents(year, month) {
+    const events = [];
+    const now = Date.now();
+    const monthStart = new Date(year, month, 1).getTime();
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59).getTime();
+
+    (state.mailEvents || []).forEach(e => {
+        if (e.date >= monthStart && e.date <= monthEnd) {
+            const d = new Date(e.date);
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            let dotClass, tooltip, shortLabel;
+            switch (e.type) {
+                case 'sent':
+                    dotClass = 'sent'; tooltip = `Envoyé : ${e.label}`; shortLabel = e.label || 'Mail'; break;
+                case 'reminder_sent':
+                    dotClass = 'reminder-sent'; tooltip = `Relance #${e.cycle || '?'} : ${e.label}`; shortLabel = `Relance #${e.cycle || '?'}`; break;
+                case 'response':
+                    dotClass = 'response'; tooltip = `Réponse : ${e.label}`; shortLabel = 'Réponse'; break;
+                default: return;
+            }
+            events.push({ ...e, dateStr, dotClass, tooltip, shortLabel });
+        }
+    });
+
+    (state.reminders || []).forEach(r => {
+        if (r.status === 'dismissed' || r.status === 'responded' || r.status === 'sent') return;
+        if (r.remindAt >= monthStart && r.remindAt <= monthEnd) {
+            const d = new Date(r.remindAt);
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const isDue = r.remindAt <= now;
+            const dotClass = isDue ? 'reminder-due' : 'reminder-pending';
+            const tooltip = isDue ? `⚠ Rappel dû : ${r.label}` : `Rappel prévu : ${r.label}`;
+            const shortLabel = isDue ? '⚠ Rappel' : `J+${r.cycle * 3}`;
+            events.push({ ...r, dateStr, dotClass, tooltip, shortLabel, isReminder: true, reminderId: r.id });
+        }
+    });
+
+    return events;
+}
+
+function navigateTimeline(direction) {
+    if (direction === 0) {
+        timelineMonth = new Date();
+    } else {
+        timelineMonth = new Date(timelineMonth.getFullYear(), timelineMonth.getMonth() + direction, 1);
+    }
+    renderTimeline();
+}
+
+function showTimelinePopover(evt, dateStr) {
+    document.querySelectorAll('.timeline-popover').forEach(p => p.remove());
+
+    const year = timelineMonth.getFullYear();
+    const month = timelineMonth.getMonth();
+    const dayEvents = getTimelineEvents(year, month).filter(e => e.dateStr === dateStr);
+    if (!dayEvents.length) return;
+
+    const dot = evt.target;
+    const popover = document.createElement('div');
+    popover.className = 'timeline-popover show';
+
+    let html = '';
+    dayEvents.forEach(e => {
+        html += `<div style="margin-bottom:0.5rem;">`;
+        html += `<div class="timeline-popover-title">${esc(e.tooltip)}</div>`;
+        html += `<div class="timeline-popover-actions">`;
+
+        if (e.isReminder && e.dotClass === 'reminder-due') {
+            html += `<button onclick="handleDueReminder('${e.reminderId}')"><i class="icon-sparkles"></i> Générer relance IA</button>`;
+            html += `<button onclick="markReminderResponseReceived('${e.reminderId}')"><i class="icon-check"></i> Réponse reçue</button>`;
+            html += `<button onclick="editReminderDate('${e.reminderId}')"><i class="icon-calendar"></i> Modifier la date</button>`;
+            html += `<button class="danger" onclick="dismissReminderFromTimeline('${e.reminderId}')"><i class="icon-trash-2"></i> Supprimer</button>`;
+        } else if (e.isReminder && e.dotClass === 'reminder-pending') {
+            html += `<button onclick="handleDueReminder('${e.reminderId}')"><i class="icon-sparkles"></i> Traiter maintenant</button>`;
+            html += `<button onclick="markReminderResponseReceived('${e.reminderId}')"><i class="icon-check"></i> Réponse reçue</button>`;
+            html += `<button onclick="editReminderDate('${e.reminderId}')"><i class="icon-calendar"></i> Modifier la date</button>`;
+            html += `<button class="danger" onclick="dismissReminderFromTimeline('${e.reminderId}')"><i class="icon-trash-2"></i> Supprimer</button>`;
+        } else if (e.type === 'sent' || e.type === 'reminder_sent') {
+            html += `<button onclick="selectMailForCompose('${e.sectionId}','${e.taskId}')"><i class="icon-mail"></i> Voir le mail</button>`;
+        }
+
+        html += `</div></div>`;
+    });
+
+    popover.innerHTML = html;
+    dot.parentElement.style.position = 'relative';
+    dot.parentElement.appendChild(popover);
+
+    setTimeout(() => {
+        const close = (ev) => {
+            if (!popover.contains(ev.target) && ev.target !== dot) {
+                popover.remove();
+                document.removeEventListener('click', close);
+            }
+        };
+        document.addEventListener('click', close);
+    }, 10);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Reminder Workflow (cycles)
+   ═══════════════════════════════════════════════════════ */
+async function handleDueReminder(rid) {
     const r = (state.reminders || []).find(x => x.id === rid);
     if (!r) return;
+
+    document.querySelectorAll('.timeline-popover').forEach(p => p.remove());
+
     if (!state.settings.geminiKey) {
-        showToast('Configure ta clé API Gemini dans ⚙️', 'error', 3000);
+        showToast('Configure ta clé API Gemini dans les paramètres', 'error', 3000);
         openSettings();
         return;
     }
+
     showLoading('L\'IA génère une relance…');
     try {
         const res = await fetch('/api/generate-reminder', {
@@ -1253,12 +2498,13 @@ async function generateReminder(rid) {
                 token: state.settings.geminiKey,
                 to: r.mailTo,
                 subject: r.mailSubject || r.label,
-                body: r.mailBody || r.note || r.label
+                body: r.mailBody || r.label,
+                cycle: r.cycle
             })
         });
         const result = await res.json();
         if (result.ok && result.reminder) {
-            currentReminder = { rid, ...result.reminder, to: r.mailTo };
+            currentReminder = { rid, ...result.reminder, to: r.mailTo, from: r.mailFrom };
             document.getElementById('reminderTo').value = r.mailTo || '';
             document.getElementById('reminderSubject').value = result.reminder.subject || '';
             document.getElementById('reminderBody').value = result.reminder.body || '';
@@ -1274,9 +2520,117 @@ async function generateReminder(rid) {
     }
 }
 
+function markReminderSent(rid) {
+    const r = (state.reminders || []).find(x => x.id === rid);
+    if (!r) return;
+
+    const now = Date.now();
+    r.status = 'sent';
+    r.sentAt = now;
+
+    state.mailEvents = state.mailEvents || [];
+    state.mailEvents.push({
+        id: uid(), taskId: r.taskId, sectionId: r.sectionId,
+        type: 'reminder_sent', date: now,
+        label: r.mailSubject || r.label, to: r.mailTo, cycle: r.cycle
+    });
+
+    state.reminders.push({
+        id: uid(), taskId: r.taskId, sectionId: r.sectionId,
+        label: r.label, mailTo: r.mailTo,
+        mailSubject: r.mailSubject, mailBody: r.mailBody, mailFrom: r.mailFrom || '',
+        createdAt: now,
+        remindAt: now + 3 * 24 * 60 * 60 * 1000,
+        cycle: r.cycle + 1, status: 'pending'
+    });
+
+    autoSave();
+    renderMailTab();
+}
+
+function confirmReminderSent() {
+    if (!currentReminder) return;
+    markReminderSent(currentReminder.rid);
+    closeReminderModal();
+    showToast('Rappel envoyé. Prochain cycle dans 3 jours.', 'success', 3000);
+}
+
+function confirmReminderResponseReceived() {
+    if (!currentReminder) return;
+    markReminderResponseReceived(currentReminder.rid);
+    closeReminderModal();
+}
+
+function markReminderResponseReceived(rid) {
+    const r = (state.reminders || []).find(x => x.id === rid);
+    if (!r) return;
+    document.querySelectorAll('.timeline-popover').forEach(p => p.remove());
+    markResponseReceived(r.sectionId, r.taskId);
+}
+
+function dismissReminderFromTimeline(rid) {
+    const r = (state.reminders || []).find(x => x.id === rid);
+    if (!r) return;
+    document.querySelectorAll('.timeline-popover').forEach(p => p.remove());
+    r.status = 'dismissed';
+    autoSave();
+    renderMailTab();
+    showToast('Rappel supprimé.', 'success');
+}
+
+function editReminderDate(rid) {
+    const r = (state.reminders || []).find(x => x.id === rid);
+    if (!r) return;
+    document.querySelectorAll('.timeline-popover').forEach(p => p.remove());
+
+    const currentDate = new Date(r.remindAt);
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+    const newDateStr = prompt('Nouvelle date du rappel (AAAA-MM-JJ) :', dateStr);
+    if (!newDateStr) return;
+
+    const parsed = new Date(newDateStr + 'T09:00:00');
+    if (isNaN(parsed.getTime())) {
+        showToast('Date invalide.', 'error');
+        return;
+    }
+
+    r.remindAt = parsed.getTime();
+    autoSave();
+    renderTimeline();
+    showToast('Date du rappel modifiée.', 'success');
+}
+
 function closeReminderModal() {
     document.getElementById('reminderModal').classList.remove('show');
     currentReminder = null;
+}
+
+async function reformulateReminder() {
+    const body = document.getElementById('reminderBody').value.trim();
+    if (!body) { showToast('Écris un message d\'abord.', 'error'); return; }
+    if (!state.settings.geminiKey) {
+        showToast('Configure ta clé API Gemini dans les paramètres', 'error', 3000);
+        return;
+    }
+    showLoading('L\'IA reformule la relance…');
+    try {
+        const r = await fetch('/api/reformulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: state.settings.geminiKey, text: body })
+        });
+        const result = await r.json();
+        if (result.text) {
+            document.getElementById('reminderBody').value = result.text;
+            showToast('Relance reformulée !', 'success');
+        } else {
+            showToast('Erreur IA : ' + (result.error || 'Échec'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
 }
 
 async function saveReminderEml() {
@@ -1293,8 +2647,6 @@ async function saveReminderEml() {
         const result = await r.json();
         if (result.ok) {
             showToast('Relance enregistrée (.eml) !', 'success', 3000);
-            if (currentReminder) dismissReminder(currentReminder.rid);
-            closeReminderModal();
         } else {
             showToast('Erreur : ' + (result.error || 'Échec'), 'error', 5000);
         }
@@ -1303,27 +2655,44 @@ async function saveReminderEml() {
     }
 }
 
-async function sendReminderThunderbird() {
+async function sendReminderSMTP() {
     const to = document.getElementById('reminderTo').value.trim();
     const subject = document.getElementById('reminderSubject').value.trim();
     const body = document.getElementById('reminderBody').value.trim();
-    if (!subject) { showToast('Sujet requis', 'error'); return; }
+    const from = currentReminder?.from || document.getElementById('mailFrom').value;
+    if (!subject || !to) { showToast('Destinataire et sujet requis', 'error'); return; }
+    showLoading('Envoi de la relance via SMTP…');
     try {
-        const r = await fetch('/api/open-thunderbird', {
+        const r = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to, subject, body })
+            body: JSON.stringify({ from, to, subject, body })
         });
         const result = await r.json();
         if (result.ok) {
-            showToast('Thunderbird ouvert !', 'success');
-            if (currentReminder) dismissReminder(currentReminder.rid);
-            closeReminderModal();
+            showToast('Relance envoyée !', 'success');
+            if (currentReminder) {
+                markReminderSent(currentReminder.rid);
+                closeReminderModal();
+            }
         } else {
             showToast('Erreur : ' + (result.error || 'Échec'), 'error', 5000);
         }
     } catch (e) {
         showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
+function updateMailBadge() {
+    const now = Date.now();
+    const pending = getAllMailTasks().filter(m => !m.sentAt);
+    const dueReminders = (state.reminders || []).filter(r => r.status === 'pending' && r.remindAt <= now);
+    const total = pending.length + dueReminders.length;
+    const tabBtn = document.querySelectorAll('.tab-btn')[1];
+    if (tabBtn) {
+        tabBtn.innerHTML = total > 0 ? `<i class="icon-send"></i> Mail <span style="font-size:0.7em;color:var(--accent-orange)">● ${total}</span>` : '<i class="icon-send"></i> Mail';
     }
 }
 
@@ -1392,22 +2761,744 @@ function launchConfetti() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   Check reminders periodically
+   Inbox — State
+   ═══════════════════════════════════════════════════════ */
+let inboxMails = [];
+let selectedInboxId = null;
+let inboxFilter = 'all';
+let deleteMailTarget = null;
+let inboxFolder = 'inbox'; // 'inbox' or 'sent'
+
+/* ═══════════════════════════════════════════════════════
+   Inbox — Load & Render
+   ═══════════════════════════════════════════════════════ */
+async function loadInbox() {
+    try {
+        const endpoint = inboxFolder === 'sent' ? '/api/inbox/sent' : '/api/inbox';
+        const r = await fetch(endpoint);
+        if (r.ok) inboxMails = await r.json();
+    } catch {}
+    renderInboxList();
+    updateInboxBadge();
+}
+
+function toggleInboxFolder() {
+    inboxFolder = inboxFolder === 'inbox' ? 'sent' : 'inbox';
+    const btn = document.getElementById('inboxFolderBtn');
+    if (btn) {
+        btn.innerHTML = inboxFolder === 'sent'
+            ? '<i class="icon-send"></i> Envoyés'
+            : '<i class="icon-inbox"></i> Reçus';
+    }
+    selectedInboxId = null;
+    document.getElementById('inboxReader').innerHTML = `
+        <div class="inbox-reader-empty">
+            <i class="icon-mail-open" style="font-size:2.5rem;color:var(--text-muted)"></i>
+            <p>Sélectionne un mail pour le lire</p>
+        </div>`;
+    loadInbox();
+}
+
+function filterInbox() {
+    renderInboxList();
+}
+
+function setInboxFilter(filter, btn) {
+    inboxFilter = filter;
+    document.querySelectorAll('.inbox-filter-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderInboxList();
+}
+
+function getFilteredInbox() {
+    const query = (document.getElementById('inboxSearch')?.value || '').toLowerCase().trim();
+    let mails = [...inboxMails];
+
+    if (inboxFilter === 'unread') mails = mails.filter(m => !m.read);
+    if (inboxFilter === 'starred') mails = mails.filter(m => m.starred);
+
+    if (query) {
+        mails = mails.filter(m =>
+            (m.subject || '').toLowerCase().includes(query) ||
+            (m.from_name || '').toLowerCase().includes(query) ||
+            (m.from_email || '').toLowerCase().includes(query) ||
+            (m.body || '').toLowerCase().includes(query)
+        );
+    }
+
+    return mails;
+}
+
+function renderInboxList() {
+    const container = document.getElementById('inboxList');
+    if (!container) return;
+
+    const mails = getFilteredInbox();
+
+    if (!mails.length) {
+        container.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text-muted)">
+            ${inboxMails.length ? 'Aucun résultat' : 'Boîte de réception vide. Clique sur Relever pour récupérer le courrier.'}
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = mails.map(m => {
+        const isSelected = selectedInboxId === m.id;
+        const unread = !m.read ? 'unread' : '';
+        const isSent = m.folder === 'sent';
+        const fromDisplay = isSent ? ('→ ' + (m.to || '').split(',')[0].trim()) : (m.from_name || m.from_email || 'Inconnu');
+        const preview = (m.body || '').substring(0, 80).replace(/\n/g, ' ');
+        const hasAttach = m.attachments && m.attachments.length > 0;
+
+        return `
+        <div class="inbox-item ${unread} ${isSelected ? 'selected' : ''}" onclick="openInboxMail('${esc(m.id)}')">
+            <div class="inbox-item-dot"></div>
+            <span class="inbox-item-star ${m.starred ? 'starred' : ''}"
+                onclick="event.stopPropagation();toggleInboxStar('${esc(m.id)}')">★</span>
+            <div class="inbox-item-content">
+                <div class="inbox-item-top">
+                    <span class="inbox-item-from">${esc(fromDisplay)}</span>
+                    <span class="inbox-item-date">${esc(m.date || '')}</span>
+                </div>
+                <div class="inbox-item-subject">${esc(m.subject || 'Sans sujet')}</div>
+                <div class="inbox-item-preview">${esc(preview)}</div>
+                ${hasAttach ? '<div class="inbox-item-attach"><i class="icon-paperclip"></i> ' + m.attachments.length + ' pièce(s) jointe(s)</div>' : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════
+   Inbox — Read Mail
+   ═══════════════════════════════════════════════════════ */
+async function openInboxMail(mailId) {
+    selectedInboxId = mailId;
+    const mail = inboxMails.find(m => m.id === mailId);
+    if (!mail) return;
+
+    // Mark as read
+    if (!mail.read) {
+        mail.read = true;
+        fetch('/api/mail/mark-read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: mailId, read: true })
+        }).catch(() => {});
+        updateInboxBadge();
+    }
+
+    renderInboxList();
+    renderInboxReader(mail);
+}
+
+function renderInboxReader(mail) {
+    const reader = document.getElementById('inboxReader');
+    if (!reader) return;
+
+    const attachHtml = mail.attachments && mail.attachments.length > 0
+        ? `<div class="inbox-reader-attach">
+            <h4><i class="icon-paperclip"></i> Pièces jointes</h4>
+            ${mail.attachments.map(a => `<span class="att-item">${esc(a)}</span>`).join('')}
+           </div>`
+        : '';
+
+    reader.innerHTML = `
+        <div class="inbox-reader-header">
+            <div class="inbox-reader-subject">${esc(mail.subject || 'Sans sujet')}</div>
+            <div class="inbox-reader-meta">
+                <span><strong>De :</strong> ${esc(mail.from_name || '')} &lt;${esc(mail.from_email || '')}&gt;</span>
+                <span><strong>À :</strong> ${esc(mail.to || '')}</span>
+                ${mail.cc ? `<span><strong>Cc :</strong> ${esc(mail.cc)}</span>` : ''}
+                <span><strong>Date :</strong> ${esc(mail.date || '')}</span>
+                <span><strong>Compte :</strong> ${esc(mail.account || '')}</span>
+                ${mail.folder === 'sent' ? '<span style="color:var(--accent-green);font-weight:600">📤 Envoyé</span>' : ''}
+            </div>
+            <div class="inbox-reader-actions">
+                <button onclick="replyToMail('${esc(mail.id)}')"><i class="icon-reply"></i> Répondre</button>
+                <button onclick="replyToMail('${esc(mail.id)}', true)"><i class="icon-reply"></i> Répondre à tous</button>
+                <button onclick="forwardMail('${esc(mail.id)}')"><i class="icon-forward"></i> Transférer</button>
+                <button onclick="exportMailObsidian('${esc(mail.id)}')"><i class="icon-book-open"></i> Exporter</button>
+                <button onclick="toggleInboxRead('${esc(mail.id)}')">${mail.read ? '<i class="icon-mail-open"></i> Marquer non lu' : '<i class="icon-mail"></i> Marquer lu'}</button>
+                <button class="danger" onclick="openDeleteMailModal('${esc(mail.id)}')"><i class="icon-trash-2"></i> Supprimer</button>
+            </div>
+        </div>
+        <div class="inbox-reader-body">${esc(mail.body || '(aucun contenu)')}</div>
+        ${attachHtml}`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Inbox — Actions
+   ═══════════════════════════════════════════════════════ */
+async function fetchEmails() {
+    const statusEl = document.getElementById('inbox-status');
+    statusEl.style.display = 'block';
+    statusEl.className = 'inbox-status loading';
+    statusEl.textContent = 'Connexion aux serveurs (POP3/IMAP)…';
+
+    try {
+        const r = await fetch('/api/fetch-emails', { method: 'POST' });
+        const result = await r.json();
+        if (result.error) {
+            statusEl.className = 'inbox-status error';
+            statusEl.textContent = 'Erreur : ' + result.error;
+        } else {
+            await loadInbox();
+            const errStr = result.errors && result.errors.length
+                ? ` (${result.errors.length} erreur(s))`
+                : '';
+            statusEl.className = 'inbox-status success';
+            statusEl.textContent = `${result.new_count} nouveau(x) mail(s) récupéré(s)${errStr}`;
+        }
+    } catch (e) {
+        statusEl.className = 'inbox-status error';
+        statusEl.textContent = 'Erreur réseau : ' + e.message;
+    }
+
+    setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
+}
+
+async function toggleInboxStar(mailId) {
+    const mail = inboxMails.find(m => m.id === mailId);
+    if (!mail) return;
+    mail.starred = !mail.starred;
+    // Persist star state
+    fetch('/api/mail/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: mailId, read: mail.read, starred: mail.starred })
+    }).catch(() => {});
+    renderInboxList();
+}
+
+async function toggleInboxRead(mailId) {
+    const mail = inboxMails.find(m => m.id === mailId);
+    if (!mail) return;
+    mail.read = !mail.read;
+    fetch('/api/mail/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: mailId, read: mail.read })
+    }).catch(() => {});
+    renderInboxList();
+    renderInboxReader(mail);
+    updateInboxBadge();
+}
+
+function replyToMail(mailId, replyAll) {
+    const mail = inboxMails.find(m => m.id === mailId);
+    if (!mail) return;
+    switchTab('mail');
+    // Pre-fill composer
+    mailRecipients = mail.from_email ? [mail.from_email] : [];
+    mailCcRecipients = [];
+
+    if (replyAll) {
+        // Add all To: recipients (except our account) to To
+        const toAddrs = (mail.to || '').split(',').map(e => e.trim()).filter(e => e && e !== mail.account);
+        toAddrs.forEach(addr => {
+            if (!mailRecipients.includes(addr)) mailRecipients.push(addr);
+        });
+        // Add CC recipients
+        if (mail.cc) {
+            const ccAddrs = mail.cc.split(',').map(e => e.trim()).filter(e => e && e !== mail.account);
+            mailCcRecipients = ccAddrs;
+        }
+    }
+
+    renderMailTags();
+    renderCcTags();
+    document.getElementById('mailSubject').value = 'Re: ' + (mail.subject || '').replace(/^Re:\s*/i, '');
+    const quotedBody = '\n\n--- Le ' + (mail.date || '') + ', ' + (mail.from_name || mail.from_email || '') + ' a écrit :\n' + (mail.body || '');
+    document.getElementById('mailBody').value = quotedBody;
+    // Try to match account
+    const fromSel = document.getElementById('mailFrom');
+    if (mail.account) {
+        for (let i = 0; i < fromSel.options.length; i++) {
+            if (fromSel.options[i].value === mail.account) { fromSel.selectedIndex = i; break; }
+        }
+    }
+    document.getElementById('mailBody').focus();
+}
+
+function forwardMail(mailId) {
+    const mail = inboxMails.find(m => m.id === mailId);
+    if (!mail) return;
+    switchTab('mail');
+    mailRecipients = [];
+    mailCcRecipients = [];
+    renderMailTags();
+    renderCcTags();
+    document.getElementById('mailSubject').value = 'Fwd: ' + (mail.subject || '').replace(/^Fwd:\s*/i, '');
+    const fwdBody = '\n\n--- Mail transféré ---\n'
+        + 'De : ' + (mail.from_name || '') + ' <' + (mail.from_email || '') + '>\n'
+        + 'Date : ' + (mail.date || '') + '\n'
+        + 'À : ' + (mail.to || '') + '\n'
+        + (mail.cc ? 'Cc : ' + mail.cc + '\n' : '')
+        + 'Sujet : ' + (mail.subject || '') + '\n\n'
+        + (mail.body || '');
+    document.getElementById('mailBody').value = fwdBody;
+    document.getElementById('mailToInput').focus();
+}
+
+async function exportMailObsidian(mailId) {
+    showLoading('Export vers Obsidian…');
+    try {
+        const r = await fetch('/api/mail/export-obsidian', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: mailId })
+        });
+        const result = await r.json();
+        if (result.ok) {
+            showToast('Exporté vers Obsidian !', 'success', 3000);
+        } else {
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function exportAllObsidian() {
+    showLoading('Export de tous les mails vers Obsidian…');
+    try {
+        const r = await fetch('/api/mail/export-obsidian-all', { method: 'POST' });
+        const result = await r.json();
+        if (result.ok) {
+            const errStr = result.errors && result.errors.length
+                ? ` (${result.errors.length} erreur(s))`
+                : '';
+            showToast(`${result.exported} mail(s) exporté(s)${errStr}`, 'success', 3000);
+        } else {
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Inbox — Delete
+   ═══════════════════════════════════════════════════════ */
+function openDeleteMailModal(mailId) {
+    deleteMailTarget = mailId;
+    const mail = inboxMails.find(m => m.id === mailId);
+    document.getElementById('deleteMailSubject').textContent = mail ? mail.subject : '';
+    document.getElementById('deleteOnServer').checked = false;
+    document.getElementById('deleteMailModal').classList.add('show');
+}
+
+function closeDeleteMailModal() {
+    document.getElementById('deleteMailModal').classList.remove('show');
+    deleteMailTarget = null;
+}
+
+async function confirmDeleteMail() {
+    if (!deleteMailTarget) return;
+    const deleteOnServer = document.getElementById('deleteOnServer').checked;
+    closeDeleteMailModal();
+    showLoading('Suppression du mail…');
+    try {
+        const r = await fetch('/api/mail/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: deleteMailTarget, delete_on_server: deleteOnServer })
+        });
+        const result = await r.json();
+        if (result.ok) {
+            inboxMails = inboxMails.filter(m => m.id !== deleteMailTarget);
+            if (selectedInboxId === deleteMailTarget) {
+                selectedInboxId = null;
+                document.getElementById('inboxReader').innerHTML = `
+                    <div class="inbox-reader-empty">
+                        <i class="icon-mail-open" style="font-size:2.5rem;color:var(--text-muted)"></i>
+                        <p>Sélectionne un mail pour le lire</p>
+                    </div>`;
+            }
+            renderInboxList();
+            updateInboxBadge();
+            showToast('Mail supprimé', 'success');
+        } else {
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Inbox — Badge
+   ═══════════════════════════════════════════════════════ */
+function updateInboxBadge() {
+    const unread = inboxMails.filter(m => !m.read).length;
+    const tabBtn = document.querySelectorAll('.tab-btn')[1];
+    if (tabBtn) {
+        tabBtn.innerHTML = unread > 0 ? `<i class="icon-inbox"></i> Inbox <span style="font-size:0.75em;color:var(--accent-blue)">(${unread})</span>` : '<i class="icon-inbox"></i> Inbox';
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Accounts Modal
+   ═══════════════════════════════════════════════════════ */
+let accountsData = [];
+
+async function openAccountsModal() {
+    try {
+        const r = await fetch('/api/accounts');
+        if (r.ok) accountsData = await r.json();
+    } catch {}
+    renderAccountsList();
+    document.getElementById('accountsModal').classList.add('show');
+}
+
+function closeAccountsModal() {
+    document.getElementById('accountsModal').classList.remove('show');
+}
+
+function renderAccountsList() {
+    const container = document.getElementById('accountsList');
+    if (!accountsData.length) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem">Aucun compte configuré.</p>';
+        return;
+    }
+    container.innerHTML = accountsData.map((acc, i) => `
+        <div class="account-card" data-idx="${i}">
+            <button class="account-delete" onclick="removeAccount(${i})" title="Supprimer">✕</button>
+            <div class="form-group">
+                <label>Adresse email</label>
+                <div style="display:flex;gap:0.4rem">
+                    <input type="text" value="${esc(acc.email || '')}" onchange="accountsData[${i}].email=this.value" placeholder="user@example.com" style="flex:1" id="accEmail_${i}">
+                    <button onclick="autoconfigAccount(${i})" style="white-space:nowrap;padding:0.3rem 0.6rem;background:var(--accent-purple);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.72rem" title="Auto-détecter les paramètres">⚡ Autoconfig</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Protocole de réception</label>
+                <select onchange="accountsData[${i}].protocol=this.value;renderAccountsList()" style="width:100%;background:var(--bg-surface);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:0.35rem 0.5rem;color:var(--text);font-size:0.78rem;cursor:pointer">
+                    <option value="pop3" ${(acc.protocol||'pop3')==='pop3'?'selected':''}>POP3</option>
+                    <option value="imap" ${acc.protocol==='imap'?'selected':''}>IMAP</option>
+                </select>
+            </div>
+            ${(acc.protocol||'pop3') === 'pop3' ? `
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Serveur POP3</label>
+                    <input type="text" value="${esc(acc.pop3_server || '')}" onchange="accountsData[${i}].pop3_server=this.value" placeholder="pop.example.com">
+                </div>
+                <div class="form-group">
+                    <label>Port POP3</label>
+                    <input type="number" value="${acc.pop3_port || 995}" onchange="accountsData[${i}].pop3_port=parseInt(this.value)">
+                </div>
+            </div>` : `
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Serveur IMAP</label>
+                    <input type="text" value="${esc(acc.imap_server || '')}" onchange="accountsData[${i}].imap_server=this.value" placeholder="imap.gmail.com">
+                </div>
+                <div class="form-group">
+                    <label>Port IMAP</label>
+                    <input type="number" value="${acc.imap_port || 993}" onchange="accountsData[${i}].imap_port=parseInt(this.value)">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Après téléchargement</label>
+                <select onchange="accountsData[${i}].imap_post_action=this.value" style="width:100%;background:var(--bg-surface);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:0.35rem 0.5rem;color:var(--text);font-size:0.78rem;cursor:pointer">
+                    <option value="mark_read" ${(acc.imap_post_action||'mark_read')==='mark_read'?'selected':''}>Marquer comme lus (conserver sur le serveur)</option>
+                    <option value="delete" ${acc.imap_post_action==='delete'?'selected':''}>Supprimer du serveur</option>
+                </select>
+            </div>`}
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Serveur SMTP</label>
+                    <input type="text" value="${esc(acc.smtp_server || '')}" onchange="accountsData[${i}].smtp_server=this.value" placeholder="smtp.example.com">
+                </div>
+                <div class="form-group">
+                    <label>Port SMTP</label>
+                    <input type="number" value="${acc.smtp_port || 587}" onchange="accountsData[${i}].smtp_port=parseInt(this.value)">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Identifiant</label>
+                    <input type="text" value="${esc(acc.username || '')}" onchange="accountsData[${i}].username=this.value" placeholder="user@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" value="${esc(acc.password || '')}" onchange="accountsData[${i}].password=this.value">
+                </div>
+            </div>
+            <div class="form-row">
+                ${(acc.protocol||'pop3') === 'pop3' ? `
+                <label class="account-toggle">
+                    <input type="checkbox" ${acc.pop3_ssl !== false ? 'checked' : ''} onchange="accountsData[${i}].pop3_ssl=this.checked">
+                    POP3 SSL
+                </label>` : `
+                <label class="account-toggle">
+                    <input type="checkbox" ${acc.imap_ssl !== false ? 'checked' : ''} onchange="accountsData[${i}].imap_ssl=this.checked">
+                    IMAP SSL
+                </label>`}
+                <label class="account-toggle">
+                    <input type="checkbox" ${acc.smtp_starttls !== false ? 'checked' : ''} onchange="accountsData[${i}].smtp_starttls=this.checked">
+                    SMTP STARTTLS
+                </label>
+                <label class="account-toggle">
+                    <input type="checkbox" ${acc.smtp_ssl ? 'checked' : ''} onchange="accountsData[${i}].smtp_ssl=this.checked">
+                    SMTP SSL
+                </label>
+                <label class="account-toggle">
+                    <input type="checkbox" ${acc.enabled !== false ? 'checked' : ''} onchange="accountsData[${i}].enabled=this.checked">
+                    Activé
+                </label>
+            </div>
+        </div>
+    `).join('');
+}
+
+function addAccountForm() {
+    accountsData.push({
+        email: '', protocol: 'imap',
+        pop3_server: '', pop3_port: 995, pop3_ssl: true,
+        imap_server: '', imap_port: 993, imap_ssl: true, imap_post_action: 'mark_read',
+        smtp_server: '', smtp_port: 587, smtp_starttls: true, smtp_ssl: false,
+        username: '', password: '', enabled: true
+    });
+    renderAccountsList();
+}
+
+function removeAccount(idx) {
+    accountsData.splice(idx, 1);
+    renderAccountsList();
+}
+
+async function saveAccountsFromModal() {
+    try {
+        const r = await fetch('/api/accounts/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accounts: accountsData })
+        });
+        const result = await r.json();
+        if (result.ok) {
+            closeAccountsModal();
+            showToast('Comptes enregistrés', 'success');
+            // Update the mail composer's From dropdown
+            updateMailFromOptions();
+        } else {
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    }
+}
+
+function updateMailFromOptions() {
+    const select = document.getElementById('mailFrom');
+    if (!select) return;
+    // Keep existing options and add any new accounts
+    const existing = new Set();
+    for (let i = 0; i < select.options.length; i++) {
+        existing.add(select.options[i].value);
+    }
+    accountsData.forEach(acc => {
+        if (acc.email && !existing.has(acc.email)) {
+            const opt = document.createElement('option');
+            opt.value = acc.email;
+            opt.textContent = acc.email;
+            select.appendChild(opt);
+        }
+    });
+}
+
+/* ═══════════════════════════════════════════════════════
+   SMTP Send from Composer
+   ═══════════════════════════════════════════════════════ */
+async function sendMailSMTP() {
+    const from = document.getElementById('mailFrom').value;
+    const to = getMailToValue();
+    const cc = getMailCcValue();
+    const subject = document.getElementById('mailSubject').value.trim();
+    const body = document.getElementById('mailBody').value.trim();
+    if (!to || !subject) { showToast('Remplis le(s) destinataire(s) et le sujet.', 'error'); return; }
+
+    // Save to task if associated
+    if (selectedMailTask) saveMailFieldsToTask();
+
+    // Prepare attachments as base64
+    const attachments = await prepareAttachmentsForSend();
+
+    showLoading('Envoi du mail via SMTP…');
+    try {
+        const r = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from, to, subject, body, cc, attachments: attachments.length ? attachments : undefined })
+        });
+        const result = await r.json();
+        if (result.ok) {
+            showToast('Mail envoyé et sauvegardé !', 'success', 3000);
+            clearAttachments();
+            // Mark associated task as sent
+            if (selectedMailTask) {
+                markMailTaskSent(selectedMailTask.sid, selectedMailTask.tid);
+                autoSave();
+                renderMailTab();
+                render();
+            }
+        } else {
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Attachments management
+   ═══════════════════════════════════════════════════════ */
+let pendingAttachments = []; // { file: File, name: string }
+
+function handleAttachmentFiles(files) {
+    for (const file of files) {
+        if (!pendingAttachments.find(a => a.name === file.name && a.file.size === file.size)) {
+            pendingAttachments.push({ file, name: file.name });
+        }
+    }
+    renderAttachmentList();
+    // Reset input so same file can be re-added
+    document.getElementById('attachmentInput').value = '';
+}
+
+function removeAttachment(idx) {
+    pendingAttachments.splice(idx, 1);
+    renderAttachmentList();
+}
+
+function clearAttachments() {
+    pendingAttachments = [];
+    renderAttachmentList();
+}
+
+function renderAttachmentList() {
+    const list = document.getElementById('attachmentList');
+    const placeholder = document.getElementById('attachmentPlaceholder');
+    if (!pendingAttachments.length) {
+        list.innerHTML = '';
+        placeholder.style.display = '';
+        return;
+    }
+    placeholder.style.display = 'none';
+    list.innerHTML = pendingAttachments.map((a, i) => {
+        const sizeKB = (a.file.size / 1024).toFixed(1);
+        return `<span style="display:inline-flex;align-items:center;gap:0.25rem;background:var(--bg-surface);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:0.15rem 0.5rem;font-size:0.75rem;color:var(--text)">
+            📎 ${esc(a.name)} <span style="color:var(--text-muted)">(${sizeKB} Ko)</span>
+            <button onclick="event.stopPropagation();removeAttachment(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem;padding:0 0.15rem">&times;</button>
+        </span>`;
+    }).join('');
+}
+
+async function prepareAttachmentsForSend() {
+    const results = [];
+    for (const att of pendingAttachments) {
+        const data = await fileToBase64(att.file);
+        results.push({
+            filename: att.name,
+            content_type: att.file.type || 'application/octet-stream',
+            data: data
+        });
+    }
+    return results;
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const b64 = reader.result.split(',')[1];
+            resolve(b64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// Drag & drop support for attachment zone
+(function initAttachmentDragDrop() {
+    document.addEventListener('DOMContentLoaded', () => {
+        const zone = document.getElementById('attachmentZone');
+        if (!zone) return;
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent-blue)'; });
+        zone.addEventListener('dragleave', () => { zone.style.borderColor = 'var(--card-border)'; });
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.style.borderColor = 'var(--card-border)';
+            if (e.dataTransfer.files.length) handleAttachmentFiles(e.dataTransfer.files);
+        });
+    });
+})();
+
+/* ═══════════════════════════════════════════════════════
+   Email Autoconfig (Mozilla Thunderbird DB)
+   ═══════════════════════════════════════════════════════ */
+async function autoconfigAccount(idx) {
+    const emailInput = document.getElementById('accEmail_' + idx);
+    const email = emailInput ? emailInput.value.trim() : accountsData[idx].email;
+    if (!email || !email.includes('@')) {
+        showToast('Saisis d\'abord une adresse email valide.', 'error');
+        return;
+    }
+    accountsData[idx].email = email;
+    showLoading('Recherche de la configuration pour ' + email.split('@')[1] + '…');
+    try {
+        const r = await fetch('/api/autoconfig', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const result = await r.json();
+        if (result.ok && result.config) {
+            const cfg = result.config;
+            if (cfg.imap) {
+                accountsData[idx].protocol = 'imap';
+                accountsData[idx].imap_server = cfg.imap.server;
+                accountsData[idx].imap_port = cfg.imap.port;
+                accountsData[idx].imap_ssl = cfg.imap.ssl;
+                accountsData[idx].username = cfg.imap.username || email;
+            }
+            if (cfg.smtp) {
+                accountsData[idx].smtp_server = cfg.smtp.server;
+                accountsData[idx].smtp_port = cfg.smtp.port;
+                accountsData[idx].smtp_ssl = cfg.smtp.ssl || false;
+                accountsData[idx].smtp_starttls = cfg.smtp.starttls || false;
+                if (!accountsData[idx].username) {
+                    accountsData[idx].username = cfg.smtp.username || email;
+                }
+            }
+            renderAccountsList();
+            const source = cfg.source === 'mozilla' ? 'base Mozilla Thunderbird' : 'détection automatique';
+            showToast(`Configuration trouvée (${source}) !`, 'success', 3000);
+        } else {
+            showToast(result.error || 'Aucune configuration trouvée.', 'error', 4000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Periodic mail badge update
    ═══════════════════════════════════════════════════════ */
 setInterval(() => {
-    if (currentTab === 'mail') renderReminders();
-    // Also check if on todo tab and there are due reminders — show a subtle notification
-    const now = Date.now();
-    const due = (state.reminders || []).filter(r => !r.dismissed && r.remindAt <= now);
-    if (due.length > 0 && currentTab === 'todo') {
-        const tabBtn = document.querySelectorAll('.tab-btn')[1];
-        if (tabBtn && !tabBtn.textContent.includes('●')) {
-            tabBtn.textContent = '📧 Mail ● ' + due.length;
-        }
-    } else {
-        const tabBtn = document.querySelectorAll('.tab-btn')[1];
-        if (tabBtn) tabBtn.textContent = '📧 Mail';
-    }
+    updateMailBadge();
+    if (currentTab === 'mail') renderTimeline();
 }, 30000);
 
 /* ═══════════════════════════════════════════════════════
@@ -1416,15 +3507,599 @@ setInterval(() => {
 (async function init() {
     await Promise.all([loadState(), loadContacts()]);
     render();
-    renderReminders();
-    // Check for due reminders on startup
-    const now = Date.now();
-    const due = (state.reminders || []).filter(r => !r.dismissed && r.remindAt <= now);
-    if (due.length > 0) {
-        const tabBtn = document.querySelectorAll('.tab-btn')[1];
-        if (tabBtn) tabBtn.textContent = '📧 Mail ● ' + due.length;
-    }
+    updateMailBadge();
+    loadInbox().then(() => {
+        updateInboxBadge();
+        // Populate From dropdown with account emails
+        fetch('/api/accounts').then(r => r.json()).then(accs => {
+            accountsData = accs;
+            updateMailFromOptions();
+        }).catch(() => {});
+    });
+    if (currentTab === 'mail') renderMailTab();
 })();
+
+/* ═══════════════════════════════════════════════════════
+   Custom Titlebar Controls
+   ═══════════════════════════════════════════════════════ */
+(function initTitlebar() {
+    const api = window.electronAPI;
+    if (!api) return; // not running in Electron
+
+    document.getElementById('btn-minimize').addEventListener('click', () => api.minimize());
+    document.getElementById('btn-maximize').addEventListener('click', () => api.maximize());
+    document.getElementById('btn-close').addEventListener('click', () => api.close());
+})();
+
+/* ═══════════════════════════════════════════════════════
+   Custom Context Menu (right-click)
+   ═══════════════════════════════════════════════════════ */
+document.addEventListener('contextmenu', (e) => {
+    const api = window.electronAPI;
+    if (!api) return; // browser fallback = default context menu
+    e.preventDefault();
+
+    const taskItem = e.target.closest('.task-item');
+    const params = {
+        hasSelection: !!window.getSelection().toString(),
+        isEditable: e.target.matches('input, textarea, [contenteditable]'),
+        isTask: !!taskItem,
+        taskId: taskItem ? taskItem.dataset.tid : null,
+        sectionId: taskItem ? taskItem.dataset.sid : null,
+        isTaskDone: taskItem ? taskItem.classList.contains('checked') : false,
+    };
+
+    api.showContextMenu(params);
+});
+
+// Listen for context menu actions from main process
+if (window.electronAPI) {
+    window.electronAPI.onContextMenuAction('context-menu:toggle-task', (tid, sid) => {
+        if (typeof toggleTask === 'function') toggleTask(sid, tid);
+    });
+    window.electronAPI.onContextMenuAction('context-menu:delete-task', (tid, sid) => {
+        if (typeof deleteTask === 'function') deleteTask(sid, tid);
+    });
+}
+
+/* ═══════════════════════════════════════════════════════
+   Vault Graph (D3.js force-directed — local IPC scan)
+   ═══════════════════════════════════════════════════════ */
+let d3Sim = null;
+let graphData = null;
+let graphHiddenGroups = new Set();
+let d3Zoom = null;
+let d3SvgG = null;
+let graphNodeMap = {};
+let selectedGraphNode = null;
+let graphTickQueued = false;
+let graphCurrentZoomK = 1;
+
+let graphDataLoaded = false;
+
+const GROUP_COLORS = { mail: '#89b4fa', md: '#a6e3a1', attachment: '#fab387', orphan: '#6c7086' };
+
+async function initGraphIfNeeded() {
+    if (graphDataLoaded) return;
+    const svg = document.getElementById('graphSvg');
+    if (!svg) return;
+    try {
+        const api = window.electronAPI;
+        if (api && api.scanVaultGraph) {
+            graphData = await api.scanVaultGraph();
+        } else {
+            const r = await fetch('/api/vault/graph');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            graphData = await r.json();
+        }
+        if (graphData.error) throw new Error(graphData.error);
+        graphDataLoaded = true;
+        // Build node map for sidebar list
+        graphNodeMap = {};
+        graphData.nodes.forEach(n => { graphNodeMap[n.id] = n; });
+        buildNodeList();
+        updateGraphStats();
+        // Show placeholder — graph renders only on search
+        showGraphPlaceholder();
+    } catch (err) {
+        console.error('Graph load error:', err);
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#f38ba8" font-size="12">Erreur : ' + err.message + '</text>';
+    }
+}
+
+function showGraphPlaceholder() {
+    // Destroy any running simulation
+    if (d3Sim) { d3Sim.stop(); d3Sim = null; }
+    const svg = d3.select('#graphSvg');
+    svg.selectAll('*').remove();
+    svg.node().__d3refs = null;
+    document.getElementById('graphPlaceholder').style.display = '';
+    document.getElementById('graphZoomControls').style.display = 'none';
+}
+
+function buildD3Graph(subNodes, subEdges, highlightIds) {
+    // Stop previous simulation
+    if (d3Sim) { d3Sim.stop(); d3Sim = null; }
+
+    const svg = d3.select('#graphSvg');
+    svg.selectAll('*').remove();
+    const rect = svg.node().getBoundingClientRect();
+    const W = rect.width || 800, H = rect.height || 600;
+
+    // Clone data for D3 (it mutates objects)
+    const nodes = subNodes.map(n => ({ ...n }));
+    const nodeIndex = {};
+    nodes.forEach((n, i) => { nodeIndex[n.id] = i; });
+    const links = subEdges
+        .filter(e => e.source in nodeIndex && e.target in nodeIndex)
+        .map(e => ({ source: e.source, target: e.target }));
+
+    // Zoom behavior — cap at 4x to avoid GPU tile memory overflow in Electron
+    d3Zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', (event) => {
+        d3SvgG.attr('transform', event.transform);
+        const k = event.transform.k;
+        if (Math.abs(k - graphCurrentZoomK) > 0.15 || (k >= 0.6) !== (graphCurrentZoomK >= 0.6)) {
+            graphCurrentZoomK = k;
+            updateLabelsVisibility(k);
+        }
+    });
+    svg.call(d3Zoom);
+
+    d3SvgG = svg.append('g').attr('class', 'graph-g');
+
+    // Links
+    const link = d3SvgG.append('g').attr('class', 'links')
+        .selectAll('line').data(links).join('line')
+        .attr('stroke', '#313244').attr('stroke-width', 0.6).attr('opacity', 0.5);
+
+    // Nodes
+    const node = d3SvgG.append('g').attr('class', 'nodes')
+        .selectAll('circle').data(nodes).join('circle')
+        .attr('r', d => d.type === 'orphan' ? 3 : (d.type === 'attachment' ? 4 : 5))
+        .attr('fill', d => GROUP_COLORS[d.group] || '#6c7086')
+        .attr('stroke', d => highlightIds && highlightIds.has(d.id) ? '#cdd6f4' : '#1e1e2e')
+        .attr('stroke-width', d => highlightIds && highlightIds.has(d.id) ? 1.5 : 0.5)
+        .attr('opacity', d => highlightIds && !highlightIds.has(d.id) ? 0.4 : 1)
+        .attr('cursor', 'pointer')
+        .on('click', (event, d) => {
+            event.stopPropagation();
+            onNodeClick(d, nodes, links);
+        })
+        .call(d3.drag()
+            .on('start', (event, d) => { if (!event.active) d3Sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+            .on('end', (event, d) => { if (!event.active) d3Sim.alphaTarget(0); d.fx = null; d.fy = null; })
+        );
+
+    // Labels (hidden by default, shown at sufficient zoom)
+    const label = d3SvgG.append('g').attr('class', 'labels')
+        .selectAll('text').data(nodes).join('text')
+        .text(d => d.label.length > 25 ? d.label.slice(0, 22) + '…' : d.label)
+        .attr('font-size', 7).attr('fill', '#6c7086')
+        .attr('text-anchor', 'middle').attr('dy', d => (d.type === 'orphan' ? 8 : 12))
+        .attr('pointer-events', 'none')
+        .style('display', 'none');
+
+    // Click on background to deselect
+    svg.on('click', () => { clearGraphHighlight(nodes, links); closeGraphReader(); });
+
+    // Force simulation — rAF-batched rendering
+    svg.node().classList.add('simulating');
+
+    function renderTick() {
+        graphTickQueued = false;
+        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        node.attr('cx', d => d.x).attr('cy', d => d.y);
+        label.attr('x', d => d.x).attr('y', d => d.y);
+    }
+
+    d3Sim = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(60))
+        .force('charge', d3.forceManyBody().strength(-50).distanceMax(300))
+        .force('center', d3.forceCenter(W / 2, H / 2))
+        .force('collision', d3.forceCollide().radius(8))
+        .alphaDecay(0.04)
+        .on('tick', () => {
+            if (!graphTickQueued) {
+                graphTickQueued = true;
+                requestAnimationFrame(renderTick);
+            }
+        })
+        .on('end', () => {
+            svg.node().classList.remove('simulating');
+            renderTick();
+            updateLabelsVisibility(graphCurrentZoomK);
+        });
+
+    // Store references for highlighting
+    svg.node().__d3refs = { node, link, label, nodes, links };
+}
+
+function updateLabelsVisibility(k) {
+    const svg = d3.select('#graphSvg');
+    const refs = svg.node()?.__d3refs;
+    if (!refs) return;
+    // Only show labels when zoomed in enough (k >= 0.6), never for orphans
+    if (selectedGraphNode) return; // Don't override highlight display logic
+    refs.label.style('display', d => {
+        if (d.type === 'orphan') return 'none';
+        if (graphHiddenGroups.has(d.group)) return 'none';
+        return k >= 0.6 ? null : 'none';
+    });
+}
+
+function onNodeClick(d, nodes, links) {
+    selectedGraphNode = d.id;
+    selectNodeInList(d.id);
+    highlightGraphNode(d, nodes, links);
+    if (d.path) {
+        openGraphReader(d.label, d.path);
+    } else {
+        document.getElementById('graphReaderTitle').textContent = d.label;
+        document.getElementById('graphReaderBody').textContent = '(noeud orphelin — pas de fichier)';
+        document.getElementById('graphReader').classList.add('open');
+    }
+}
+
+function highlightGraphNode(d, nodes, links) {
+    const svg = d3.select('#graphSvg');
+    const refs = svg.node().__d3refs;
+    if (!refs) return;
+    const neighborIds = new Set([d.id]);
+    links.forEach(l => {
+        const src = typeof l.source === 'object' ? l.source.id : l.source;
+        const tgt = typeof l.target === 'object' ? l.target.id : l.target;
+        if (src === d.id) neighborIds.add(tgt);
+        if (tgt === d.id) neighborIds.add(src);
+    });
+    refs.node.attr('opacity', n => neighborIds.has(n.id) ? 1 : 0.1)
+        .attr('r', n => n.id === d.id ? 8 : (n.type === 'orphan' ? 3 : (n.type === 'attachment' ? 4 : 5)));
+    refs.link.attr('opacity', l => {
+        const src = typeof l.source === 'object' ? l.source.id : l.source;
+        const tgt = typeof l.target === 'object' ? l.target.id : l.target;
+        return (src === d.id || tgt === d.id) ? 0.8 : 0.05;
+    }).attr('stroke', l => {
+        const src = typeof l.source === 'object' ? l.source.id : l.source;
+        const tgt = typeof l.target === 'object' ? l.target.id : l.target;
+        return (src === d.id || tgt === d.id) ? '#89b4fa' : '#313244';
+    });
+    refs.label.attr('opacity', n => neighborIds.has(n.id) ? 1 : 0.1)
+        .style('display', n => neighborIds.has(n.id) ? null : 'none');
+}
+
+function clearGraphHighlight(nodes, links) {
+    selectedGraphNode = null;
+    const svg = d3.select('#graphSvg');
+    const refs = svg.node()?.__d3refs;
+    if (!refs) return;
+    refs.node.attr('opacity', 1).attr('r', d => d.type === 'orphan' ? 3 : (d.type === 'attachment' ? 4 : 5));
+    refs.link.attr('opacity', 0.5).attr('stroke', '#313244');
+    refs.label.attr('opacity', 1);
+    updateLabelsVisibility(graphCurrentZoomK);
+    document.querySelectorAll('#graphNodeList .node-item').forEach(el => el.classList.remove('active'));
+}
+
+async function openGraphReader(title, relpath) {
+    const panel = document.getElementById('graphReader');
+    const titleEl = document.getElementById('graphReaderTitle');
+    const body = document.getElementById('graphReaderBody');
+    titleEl.textContent = title;
+    body.innerHTML = '';
+    body.textContent = 'Chargement…';
+    body.style.whiteSpace = 'pre-wrap';
+    panel.classList.add('open');
+
+    const ext = relpath.split('.').pop().toLowerCase();
+    const imageExts = ['png','jpg','jpeg','gif','svg','webp','bmp','ico'];
+    const pdfExts = ['pdf'];
+    const textExts = ['md','txt','csv','json','xml','yaml','yml','html','css','js','ts','py'];
+    const api = window.electronAPI;
+
+    try {
+        // ── Images: inline preview ──
+        if (imageExts.includes(ext)) {
+            body.textContent = '';
+            body.style.whiteSpace = 'normal';
+            if (api && api.getVaultFileUrl) {
+                const res = await api.getVaultFileUrl(relpath);
+                if (res.ok) {
+                    const img = document.createElement('img');
+                    img.src = res.url;
+                    img.alt = title;
+                    body.appendChild(img);
+                } else {
+                    body.textContent = 'Erreur : ' + res.error;
+                }
+            } else {
+                body.textContent = 'Aperçu image non disponible (mode web).';
+            }
+
+        // ── PDF: inline embed ──
+        } else if (pdfExts.includes(ext)) {
+            body.textContent = '';
+            body.style.whiteSpace = 'normal';
+            if (api && api.getVaultFileUrl) {
+                const res = await api.getVaultFileUrl(relpath);
+                if (res.ok) {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = res.url;
+                    iframe.title = title;
+                    body.appendChild(iframe);
+                } else {
+                    body.textContent = 'Erreur : ' + res.error;
+                }
+            } else {
+                body.textContent = 'Aperçu PDF non disponible (mode web).';
+            }
+
+        // ── Text-based: read content ──
+        } else if (textExts.includes(ext)) {
+            let data;
+            if (api && api.readVaultFile) {
+                data = await api.readVaultFile(relpath);
+            } else {
+                const r = await fetch('/api/vault/read?path=' + encodeURIComponent(relpath));
+                data = await r.json();
+            }
+            if (data.ok) {
+                body.textContent = data.content;
+            } else {
+                body.textContent = 'Erreur : ' + (data.error || 'fichier introuvable');
+            }
+
+        // ── Other formats: open with system default ──
+        } else {
+            body.textContent = '';
+            body.style.whiteSpace = 'normal';
+            const msg = document.createElement('div');
+            msg.style.cssText = 'text-align:center; padding:2rem 0; color:var(--text-muted); font-size:0.82rem;';
+            msg.textContent = 'Pas d\u2019aperçu pour les fichiers .' + ext;
+            body.appendChild(msg);
+            const btn = document.createElement('button');
+            btn.className = 'open-external-btn';
+            btn.innerHTML = '<i class="icon-external-link"></i> Ouvrir avec l\u2019application par défaut';
+            btn.onclick = async () => {
+                if (api && api.openVaultExternal) {
+                    const res = await api.openVaultExternal(relpath);
+                    if (!res.ok) alert('Erreur : ' + res.error);
+                }
+            };
+            body.appendChild(btn);
+        }
+    } catch (err) {
+        body.textContent = 'Erreur : ' + err.message;
+    }
+}
+
+function closeGraphReader() {
+    const panel = document.getElementById('graphReader');
+    if (panel) { panel.classList.remove('open'); panel.style.width = ''; }
+    if (d3Sim) {
+        const svg = d3.select('#graphSvg');
+        const refs = svg.node()?.__d3refs;
+        if (refs) clearGraphHighlight(refs.nodes, refs.links);
+    }
+}
+
+function toggleGraphReaderExpand() {
+    const panel = document.getElementById('graphReader');
+    if (!panel) return;
+    const wrap = panel.parentElement;
+    const maxW = wrap.getBoundingClientRect().width;
+    const cur = panel.getBoundingClientRect().width;
+    panel.style.transition = 'width 0.2s ease';
+    if (cur < maxW * 0.7) {
+        panel.style.width = '85%';
+    } else {
+        panel.style.width = '380px';
+    }
+    setTimeout(() => { panel.style.transition = ''; }, 250);
+}
+
+// Resize drag handle for graph reader
+(function initGraphReaderResize() {
+    let dragging = false, startX = 0, startW = 0;
+    document.addEventListener('mousedown', (e) => {
+        if (e.target.id !== 'graphReaderResize') return;
+        const panel = document.getElementById('graphReader');
+        dragging = true;
+        startX = e.clientX;
+        startW = panel.getBoundingClientRect().width;
+        panel.style.transition = 'none';
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const panel = document.getElementById('graphReader');
+        const newW = Math.max(260, startW - (e.clientX - startX));
+        const maxW = panel.parentElement.getBoundingClientRect().width * 0.85;
+        panel.style.width = Math.min(newW, maxW) + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+})();
+
+function buildNodeList() {
+    const list = document.getElementById('graphNodeList');
+    const sorted = [...graphData.nodes].sort((a, b) => a.label.localeCompare(b.label));
+    list.innerHTML = '';
+    for (const n of sorted) {
+        const div = document.createElement('div');
+        div.className = 'node-item';
+        div.dataset.id = n.id;
+        div.dataset.group = n.group;
+        div.innerHTML = '<span class="node-type-dot" style="background:' + (GROUP_COLORS[n.group] || '#6c7086') + '"></span>' + esc(n.label);
+        div.onclick = () => focusGraphNode(n.id);
+        list.appendChild(div);
+    }
+}
+
+function focusGraphNode(nodeId) {
+    const node = graphNodeMap[nodeId];
+    if (!node) return;
+    // Trigger a search for this node's label to build its subgraph
+    const input = document.getElementById('graphSearchInput');
+    input.value = node.label;
+    filterGraphNodes(node.label);
+    // Now focus on the node in the rendered graph
+    setTimeout(() => {
+        const svg = d3.select('#graphSvg');
+        const refs = svg.node()?.__d3refs;
+        if (!refs) return;
+        const target = refs.nodes.find(n => n.id === nodeId);
+        if (!target) return;
+        const svgEl = svg.node();
+        const rect = svgEl.getBoundingClientRect();
+        const transform = d3.zoomIdentity.translate(rect.width / 2, rect.height / 2).scale(2).translate(-target.x, -target.y);
+        svg.transition().duration(500).call(d3Zoom.transform, transform);
+        onNodeClick(target, refs.nodes, refs.links);
+    }, 100);
+}
+
+function selectNodeInList(nodeId) {
+    document.querySelectorAll('#graphNodeList .node-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.id === nodeId);
+    });
+    // Scroll into view
+    const active = document.querySelector('#graphNodeList .node-item.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+}
+
+function updateGraphStats() {
+    if (!graphData) return;
+    const el = document.getElementById('graphStats');
+    const counts = { md: 0, mail: 0, attachment: 0, orphan: 0 };
+    graphData.nodes.forEach(n => { counts[n.group] = (counts[n.group] || 0) + 1; });
+    el.textContent = counts.md + ' notes · ' + counts.mail + ' mails · ' + counts.attachment + ' fichiers · ' + graphData.edges.length + ' liens';
+}
+
+function filterGraphNodes(query) {
+    const q = query.toLowerCase().trim();
+    const list = document.getElementById('graphNodeList');
+    const items = list.querySelectorAll('.node-item');
+    let shown = 0;
+    items.forEach(el => {
+        const match = !q || el.textContent.toLowerCase().includes(q);
+        const groupHidden = graphHiddenGroups.has(el.dataset.group);
+        const visible = match && !groupHidden;
+        el.style.display = visible ? '' : 'none';
+        if (visible) shown++;
+    });
+    document.getElementById('graphSearchResults').textContent = q ? shown + ' résultat(s)' : '';
+
+    // Build filtered subgraph when query >= 2 chars, otherwise show placeholder
+    if (q.length >= 2 && graphDataLoaded) {
+        buildFilteredGraph(q);
+    } else {
+        showGraphPlaceholder();
+    }
+}
+
+function buildFilteredGraph(query) {
+    const q = query.toLowerCase();
+    // Collect matching node IDs
+    const matchIds = new Set();
+    graphData.nodes.forEach(n => {
+        if (graphHiddenGroups.has(n.group)) return;
+        if (n.label.toLowerCase().includes(q)) matchIds.add(n.id);
+    });
+    // Also include direct neighbors of matched nodes for context
+    const neighborIds = new Set(matchIds);
+    graphData.edges.forEach(e => {
+        if (matchIds.has(e.source)) neighborIds.add(e.target);
+        if (matchIds.has(e.target)) neighborIds.add(e.source);
+    });
+    // Filter out hidden groups from neighbors too
+    const visibleIds = new Set();
+    neighborIds.forEach(id => {
+        const n = graphNodeMap[id];
+        if (n && !graphHiddenGroups.has(n.group)) visibleIds.add(id);
+    });
+    if (visibleIds.size === 0) {
+        showGraphPlaceholder();
+        return;
+    }
+    // Build subgraph data
+    const subNodes = graphData.nodes.filter(n => visibleIds.has(n.id));
+    const subEdges = graphData.edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target));
+    buildD3Graph(subNodes, subEdges, matchIds);
+    document.getElementById('graphPlaceholder').style.display = 'none';
+    document.getElementById('graphZoomControls').style.display = '';
+}
+
+function toggleGraphGroup(checkbox) {
+    const group = checkbox.dataset.group;
+    if (checkbox.checked) { graphHiddenGroups.delete(group); }
+    else { graphHiddenGroups.add(group); }
+    filterGraphNodes(document.getElementById('graphSearchInput').value);
+}
+
+function graphZoom(factor) {
+    const svg = d3.select('#graphSvg');
+    svg.transition().duration(200).call(d3Zoom.scaleBy, factor);
+}
+
+function graphFit() {
+    const svg = d3.select('#graphSvg');
+    const rect = svg.node().getBoundingClientRect();
+    svg.transition().duration(400).call(d3Zoom.transform, d3.zoomIdentity.translate(rect.width / 2, rect.height / 2).scale(0.5).translate(-rect.width / 2, -rect.height / 2));
+}
+
+/* ═══════════════════════════════════════════════════════
+   Keyboard Shortcuts
+   ═══════════════════════════════════════════════════════ */
+document.addEventListener('keydown', (e) => {
+    // Ctrl+E — toggle edit mode
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        toggleEdit();
+    }
+    // Ctrl+1 — switch to Todo tab
+    if ((e.ctrlKey || e.metaKey) && e.key === '1') {
+        e.preventDefault();
+        switchTab('todo');
+    }
+    // Ctrl+2 — switch to Inbox tab
+    if ((e.ctrlKey || e.metaKey) && e.key === '2') {
+        e.preventDefault();
+        switchTab('inbox');
+    }
+    // Ctrl+3 — switch to Mail tab
+    if ((e.ctrlKey || e.metaKey) && e.key === '3') {
+        e.preventDefault();
+        switchTab('mail');
+    }
+    // Ctrl+4 — switch to Graph tab
+    if ((e.ctrlKey || e.metaKey) && e.key === '4') {
+        e.preventDefault();
+        switchTab('graph');
+    }
+    // Ctrl+N — new section (when in edit mode)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n' && editMode) {
+        e.preventDefault();
+        openSectionModal();
+    }
+    // Escape — close modals
+    if (e.key === 'Escape') {
+        closeSectionModal();
+        closeSettings();
+        closeGraphReader();
+        if (typeof closeReminderModal === 'function') closeReminderModal();
+        if (typeof closeAccountsModal === 'function') closeAccountsModal();
+        if (typeof closeDeleteMailModal === 'function') closeDeleteMailModal();
+    }
+    // Delete — delete selected inbox mail
+    if (e.key === 'Delete' && currentTab === 'inbox' && selectedInboxId) {
+        openDeleteMailModal(selectedInboxId);
+    }
+});
 </script>
 </body>
 </html>

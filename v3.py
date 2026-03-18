@@ -8,10 +8,13 @@ import html2text
 import mailbox
 import shutil
 
+from pathlib import Path
+
 # --- CONFIGURATION DES CHEMINS ---
-SRC_DIR = "/home/naiken/mails"
-DEST_MD_DIR = "/home/naiken/Documents/obsidian_coffres/isen/mails"
-DEST_ATT_DIR = "/home/naiken/Documents/obsidian_coffres/isen/attachements"
+SRC_DIR = str(Path.home() / "mails")
+ISENAPP_DATA = str(Path.home() / "Documents" / "isenapp_mails")
+DEST_MD_DIR = os.path.join(ISENAPP_DATA, "mails")
+DEST_ATT_DIR = os.path.join(ISENAPP_DATA, "attachements")
 
 os.makedirs(DEST_MD_DIR, exist_ok=True)
 os.makedirs(DEST_ATT_DIR, exist_ok=True)
