@@ -476,8 +476,8 @@
     <div class="modal">
         <h2>⚙️ Paramètres</h2>
         <div class="form-group">
-            <label>Clé API OpenAI</label>
-            <input type="password" id="openaiKeyInput" placeholder="sk-...">
+            <label>Clé API Gemini</label>
+            <input type="password" id="geminiKeyInput" placeholder="AIza...">
             <small>Nécessaire pour « Reformuler ». Stockée dans data.json.</small>
         </div>
         <div class="modal-actions">
@@ -524,7 +524,7 @@
 /* ═══════════════════════════════════════════════════════
    State & Config
    ═══════════════════════════════════════════════════════ */
-let state = { sections: [], settings: { openaiKey: '' }, reminders: [] };
+let state = { sections: [], settings: { geminiKey: '' }, reminders: [] };
 let editMode = false;
 let editingSectionId = null;
 let dragData = null;
@@ -586,7 +586,7 @@ async function loadState() {
         } catch {}
     }
     if (!state.sections) state.sections = [];
-    if (!state.settings) state.settings = { openaiKey: '' };
+    if (!state.settings) state.settings = { geminiKey: '' };
     if (!state.reminders) state.reminders = [];
 }
 
@@ -997,7 +997,7 @@ function saveSectionModal() {
    Settings Modal
    ═══════════════════════════════════════════════════════ */
 function openSettings() {
-    document.getElementById('openaiKeyInput').value = state.settings.openaiKey || '';
+    document.getElementById('geminiKeyInput').value = state.settings.geminiKey || '';
     document.getElementById('settingsModal').classList.add('show');
 }
 
@@ -1006,7 +1006,7 @@ function closeSettings() {
 }
 
 function saveSettings() {
-    state.settings.openaiKey = document.getElementById('openaiKeyInput').value.trim();
+    state.settings.geminiKey = document.getElementById('geminiKeyInput').value.trim();
     closeSettings();
     autoSave();
     showToast('Paramètres sauvegardés', 'success');
@@ -1098,8 +1098,8 @@ document.addEventListener('click', e => {
 async function reformulateMail() {
     const body = document.getElementById('mailBody').value.trim();
     if (!body) { showToast('Écris un message d\'abord.', 'error'); return; }
-    if (!state.settings.openaiKey) {
-        showToast('Configure ta clé API OpenAI dans ⚙️', 'error', 3000);
+    if (!state.settings.geminiKey) {
+        showToast('Configure ta clé API Gemini dans ⚙️', 'error', 3000);
         openSettings();
         return;
     }
@@ -1108,7 +1108,7 @@ async function reformulateMail() {
         const r = await fetch('/api/reformulate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: state.settings.openaiKey, text: body })
+            body: JSON.stringify({ token: state.settings.geminiKey, text: body })
         });
         const result = await r.json();
         if (result.error) {
@@ -1221,8 +1221,8 @@ function dismissReminder(rid) {
 async function generateReminder(rid) {
     const r = (state.reminders || []).find(x => x.id === rid);
     if (!r) return;
-    if (!state.settings.openaiKey) {
-        showToast('Configure ta clé API OpenAI dans ⚙️', 'error', 3000);
+    if (!state.settings.geminiKey) {
+        showToast('Configure ta clé API Gemini dans ⚙️', 'error', 3000);
         openSettings();
         return;
     }
@@ -1232,7 +1232,7 @@ async function generateReminder(rid) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                token: state.settings.openaiKey,
+                token: state.settings.geminiKey,
                 to: r.mailTo,
                 subject: r.mailSubject || r.label,
                 body: r.mailBody || r.note || r.label
