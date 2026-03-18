@@ -24,4 +24,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on(channel, (_event, ...args) => callback(...args));
     }
   },
+
+  // ── Vault Graph ─────────────────────────────
+  scanVaultGraph: () => ipcRenderer.invoke('vault:scanGraph'),
+  readVaultFile: (relpath) => ipcRenderer.invoke('vault:readFile', relpath),
 });

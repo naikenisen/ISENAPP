@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexoMail</title>
-    <link rel="stylesheet" href="https://unpkg.com/lucide-static@0.460.0/font/lucide.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/lucide-static@0.460.0/font/lucide.css">
     <style>
         /* ─── Obsidian / VSCode Dark Theme ────────────── */
         :root {
@@ -142,7 +142,7 @@
             color: var(--text);
             box-shadow: inset 0 -2px 0 var(--accent-blue);
         }
-        .tab-btn .lucide, .tab-btn i { font-size: 14px; }
+        .tab-btn i { font-size: 14px; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
@@ -793,6 +793,82 @@
             font-size: 0.8rem; color: var(--text-muted); cursor: pointer;
         }
 
+        /* ─── Graph Tab ───────────────────────────── */
+        #tab-graph { display: none; height: calc(100vh - 120px); }
+        #tab-graph.active { display: flex; gap: 0; }
+        .graph-sidebar {
+            width: 280px; min-width: 200px; display: flex; flex-direction: column;
+            border-right: 1px solid var(--card-border); background: var(--bg-surface);
+            border-radius: var(--radius-md) 0 0 var(--radius-md); overflow: hidden;
+        }
+        .graph-search { padding: 0.5rem; }
+        .graph-search input {
+            width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm); background: var(--bg); color: var(--text);
+            font-size: 0.82rem; font-family: inherit;
+        }
+        .graph-search input:focus { outline: none; border-color: var(--accent-blue); }
+        .graph-search-results { font-size: 0.7rem; color: var(--text-muted); padding: 0 0.6rem 0.3rem; }
+        .graph-filters {
+            display: flex; gap: 0.6rem; padding: 0.25rem 0.6rem 0.5rem; flex-wrap: wrap;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .graph-filters label {
+            display: flex; align-items: center; gap: 0.3rem;
+            font-size: 0.75rem; color: var(--text-muted); cursor: pointer; white-space: nowrap;
+        }
+        .graph-filters input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--accent-blue); }
+        .graph-node-list { flex: 1; overflow-y: auto; padding: 0.25rem 0; }
+        .node-item {
+            padding: 0.3rem 0.6rem; font-size: 0.78rem; color: var(--text-muted);
+            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            border-left: 2px solid transparent; transition: background 0.1s;
+        }
+        .node-item:hover { background: var(--card-hover); color: var(--text); }
+        .node-item.active { background: var(--accent-blue-glow); color: var(--accent-blue); border-left-color: var(--accent-blue); }
+        .node-item .node-type-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; vertical-align: middle;
+        }
+        .graph-canvas-wrap { flex: 1; position: relative; background: var(--bg); border-radius: 0 var(--radius-md) var(--radius-md) 0; overflow: hidden; }
+        #graphSvg { width: 100%; height: 100%; display: block; }
+        .graph-zoom-controls {
+            position: absolute; bottom: 0.75rem; right: 0.75rem;
+            display: flex; gap: 0.3rem; z-index: 10;
+        }
+        .graph-zoom-controls button {
+            width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+            background: var(--bg-surface); color: var(--text); cursor: pointer; font-size: 1rem;
+        }
+        .graph-zoom-controls button:hover { background: var(--card-hover); }
+        .graph-reader {
+            position: absolute; top: 0; right: 0; width: 380px; height: 100%;
+            background: var(--bg-surface); border-left: 1px solid var(--card-border);
+            transform: translateX(100%); transition: transform 0.2s ease; z-index: 20;
+            display: flex; flex-direction: column;
+        }
+        .graph-reader.open { transform: translateX(0); }
+        .graph-reader-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--card-border);
+        }
+        .graph-reader-header h3 {
+            font-size: 0.85rem; font-weight: 600; color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+        }
+        .graph-reader-header button {
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            font-size: 1.1rem; padding: 0.2rem 0.4rem;
+        }
+        .graph-reader-body {
+            flex: 1; overflow-y: auto; padding: 0.8rem;
+            font-size: 0.8rem; line-height: 1.7; color: var(--text-muted);
+            white-space: pre-wrap; font-family: 'JetBrains Mono', monospace;
+        }
+        .graph-stats {
+            display: flex; gap: 1rem; padding: 0.25rem 0.6rem 0.4rem; font-size: 0.7rem; color: var(--text-muted);
+        }
+
         /* ─── Responsive ─────────────────────────────── */
         @media (max-width: 600px) {
             body { padding: 1rem 0.5rem; }
@@ -804,13 +880,13 @@
             .tab-btn { font-size: 0.85rem; padding: 0.7rem 0.5rem; }
         }
     </style>
-    <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
 
 <!-- ─── Custom Titlebar ────────────────────────── -->
 <div class="titlebar" id="titlebar">
-    <span class="titlebar-icon"><i class="lucide-terminal"></i></span>
+    <span class="titlebar-icon"><i class="icon-terminal"></i></span>
     <span class="titlebar-title">NexoMail</span>
     <div class="titlebar-controls">
         <button class="titlebar-btn" id="btn-minimize" title="Réduire">
@@ -831,10 +907,10 @@
 <div class="container">
     <!-- Tab Bar -->
     <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('todo')"><i class="lucide-list-checks"></i> Todo</button>
-        <button class="tab-btn" onclick="switchTab('inbox')"><i class="lucide-inbox"></i> Inbox</button>
-        <button class="tab-btn" onclick="switchTab('mail')"><i class="lucide-send"></i> Mail</button>
-        <button class="tab-btn" onclick="switchTab('graph')"><i class="lucide-network"></i> Graph</button>
+        <button class="tab-btn active" onclick="switchTab('todo')"><i class="icon-list-checks"></i> Todo</button>
+        <button class="tab-btn" onclick="switchTab('inbox')"><i class="icon-inbox"></i> Inbox</button>
+        <button class="tab-btn" onclick="switchTab('mail')"><i class="icon-send"></i> Mail</button>
+        <button class="tab-btn" onclick="switchTab('graph')"><i class="icon-network"></i> Graph</button>
     </div>
 
     <!-- TODO TAB -->
@@ -845,11 +921,11 @@
     <!-- INBOX TAB -->
     <div class="tab-content" id="tab-inbox">
         <header>
-            <h1><i class="lucide-inbox"></i> Boîte de réception</h1>
+            <h1><i class="icon-inbox"></i> Boîte de réception</h1>
             <div class="header-actions">
-                <button onclick="fetchEmails()"><i class="lucide-refresh-cw"></i> Relever</button>
-                <button onclick="openAccountsModal()"><i class="lucide-user"></i> Comptes</button>
-                <button onclick="exportAllObsidian()"><i class="lucide-book-open"></i> Exporter Obsidian</button>
+                <button onclick="fetchEmails()"><i class="icon-refresh-cw"></i> Relever</button>
+                <button onclick="openAccountsModal()"><i class="icon-user"></i> Comptes</button>
+                <button onclick="exportAllObsidian()"><i class="icon-book-open"></i> Exporter Obsidian</button>
             </div>
         </header>
 
@@ -863,14 +939,14 @@
                 <div class="inbox-filters">
                     <button class="inbox-filter-btn active" onclick="setInboxFilter('all', this)">Tous</button>
                     <button class="inbox-filter-btn" onclick="setInboxFilter('unread', this)">Non lus</button>
-                    <button class="inbox-filter-btn" onclick="setInboxFilter('starred', this)"><i class="lucide-star"></i></button>
+                    <button class="inbox-filter-btn" onclick="setInboxFilter('starred', this)"><i class="icon-star"></i></button>
                 </div>
                 <div id="inboxList" class="inbox-list"></div>
             </div>
             <div class="inbox-reader-panel" id="inboxReaderPanel">
                 <div id="inboxReader" class="inbox-reader">
                     <div class="inbox-reader-empty">
-                        <i class="lucide-mail-open" style="font-size:2.5rem;color:var(--text-muted)"></i>
+                        <i class="icon-mail-open" style="font-size:2.5rem;color:var(--text-muted)"></i>
                         <p>Sélectionne un mail pour le lire</p>
                     </div>
                 </div>
@@ -889,7 +965,7 @@
         <!-- Mail Composer -->
         <div class="mail-composer" id="mailComposer">
             <div id="selectedTaskBanner"></div>
-            <h2><i class="lucide-pen-line"></i> Rédiger un mail</h2>
+            <h2><i class="icon-pen-line"></i> Rédiger un mail</h2>
             <div class="mail-field">
                 <label>Expéditeur</label>
                 <select id="mailFrom">
@@ -919,19 +995,19 @@
                 <textarea id="mailBody" placeholder="Rédigez votre mail ici…"></textarea>
             </div>
             <div class="mail-actions">
-                <button onclick="sendMailSMTP()" style="background:var(--accent-blue)!important;border-color:var(--accent-blue)!important;color:white!important"><i class="lucide-send"></i> Envoyer</button>
-                <button class="accent-purple" onclick="reformulateMail()"><i class="lucide-sparkles"></i> Reformuler</button>
-                <button class="accent-green" onclick="saveMailEml()"><i class="lucide-save"></i> Enregistrer</button>
-                <button class="accent-orange" onclick="openInThunderbird()"><i class="lucide-external-link"></i> Thunderbird</button>
+                <button onclick="sendMailSMTP()" style="background:var(--accent-blue)!important;border-color:var(--accent-blue)!important;color:white!important"><i class="icon-send"></i> Envoyer</button>
+                <button class="accent-purple" onclick="reformulateMail()"><i class="icon-sparkles"></i> Reformuler</button>
+                <button class="accent-green" onclick="saveMailEml()"><i class="icon-save"></i> Enregistrer</button>
+                <button class="accent-orange" onclick="openInThunderbird()"><i class="icon-external-link"></i> Thunderbird</button>
             </div>
             <div class="mail-actions" id="mailSentActions" style="margin-top:0.5rem; display:none"></div>
         </div>
 
         <!-- v3.py execution -->
         <div class="mail-composer">
-            <h2><i class="lucide-download"></i> Importer des mails (v3.py)</h2>
+            <h2><i class="icon-download"></i> Importer des mails (v3.py)</h2>
             <div class="mail-actions">
-                <button onclick="runV3()"><i class="lucide-play"></i> Exécuter v3.py</button>
+                <button onclick="runV3()"><i class="icon-play"></i> Exécuter v3.py</button>
             </div>
             <div class="terminal-output" id="v3output" style="display:none"></div>
         </div>
@@ -942,22 +1018,24 @@
     <div class="tab-content" id="tab-graph">
         <div class="graph-sidebar">
             <div class="graph-search">
-                <input type="text" id="graphSearchInput" placeholder="Rechercher un noeud…" oninput="filterGraphNodes(this.value)">
+                <input type="text" id="graphSearchInput" placeholder="Rechercher notes, mails, fichiers…" oninput="filterGraphNodes(this.value)">
             </div>
+            <div class="graph-search-results" id="graphSearchResults"></div>
             <div class="graph-filters">
-                <label><input type="checkbox" checked data-group="md" onchange="toggleGraphGroup(this)"> <i class="lucide-file-text"></i> Notes</label>
-                <label><input type="checkbox" checked data-group="mail" onchange="toggleGraphGroup(this)"> <i class="lucide-mail"></i> Mails</label>
-                <label><input type="checkbox" checked data-group="attachment" onchange="toggleGraphGroup(this)"> <i class="lucide-paperclip"></i> Fichiers</label>
-                <label><input type="checkbox" checked data-group="orphan" onchange="toggleGraphGroup(this)"> <i class="lucide-circle-dashed"></i> Orphelins</label>
+                <label><input type="checkbox" checked data-group="md" onchange="toggleGraphGroup(this)"> <i class="icon-file-text"></i> Notes</label>
+                <label><input type="checkbox" checked data-group="mail" onchange="toggleGraphGroup(this)"> <i class="icon-mail"></i> Mails</label>
+                <label><input type="checkbox" checked data-group="attachment" onchange="toggleGraphGroup(this)"> <i class="icon-paperclip"></i> Fichiers</label>
+                <label><input type="checkbox" checked data-group="orphan" onchange="toggleGraphGroup(this)"> <i class="icon-circle-dashed"></i> Orphelins</label>
             </div>
+            <div class="graph-stats" id="graphStats"></div>
             <div class="graph-node-list" id="graphNodeList"></div>
         </div>
         <div class="graph-canvas-wrap">
-            <div id="cy"></div>
+            <svg id="graphSvg"></svg>
             <div class="graph-zoom-controls">
-                <button onclick="cyInstance&&cyInstance.zoom(cyInstance.zoom()*1.2)" title="Zoom in">+</button>
-                <button onclick="cyInstance&&cyInstance.zoom(cyInstance.zoom()/1.2)" title="Zoom out">−</button>
-                <button onclick="cyInstance&&cyInstance.fit(undefined,40)" title="Fit">⊡</button>
+                <button onclick="graphZoom(1.3)" title="Zoom in">+</button>
+                <button onclick="graphZoom(1/1.3)" title="Zoom out">−</button>
+                <button onclick="graphFit()" title="Fit">⊡</button>
             </div>
         </div>
         <div class="graph-reader" id="graphReader">
@@ -1006,7 +1084,7 @@
 <!-- Settings Modal -->
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettings()">
     <div class="modal">
-        <h2><i class="lucide-settings"></i> Paramètres</h2>
+        <h2><i class="icon-settings"></i> Paramètres</h2>
         <div class="form-group">
             <label>Clé API Gemini</label>
             <input type="password" id="geminiKeyInput" placeholder="AIza...">
@@ -1022,7 +1100,7 @@
 <!-- Reminder Modal -->
 <div class="modal-overlay" id="reminderModal" onclick="if(event.target===this)closeReminderModal()">
     <div class="modal" style="max-width:600px">
-        <h2 id="reminderModalTitle"><i class="lucide-sparkles"></i> Relance générée par IA</h2>
+        <h2 id="reminderModalTitle"><i class="icon-sparkles"></i> Relance générée par IA</h2>
         <div class="mail-field">
             <label>Destinataire</label>
             <input type="text" id="reminderTo" readonly>
@@ -1037,13 +1115,13 @@
         </div>
         <div class="modal-actions">
             <button onclick="closeReminderModal()">Annuler</button>
-            <button class="accent-purple" onclick="reformulateReminder()"><i class="lucide-sparkles"></i> Reformuler</button>
-            <button class="accent-green" onclick="saveReminderEml()"><i class="lucide-save"></i> .eml</button>
-            <button class="accent-orange" onclick="sendReminderThunderbird()"><i class="lucide-external-link"></i> Thunderbird</button>
+            <button class="accent-purple" onclick="reformulateReminder()"><i class="icon-sparkles"></i> Reformuler</button>
+            <button class="accent-green" onclick="saveReminderEml()"><i class="icon-save"></i> .eml</button>
+            <button class="accent-orange" onclick="sendReminderThunderbird()"><i class="icon-external-link"></i> Thunderbird</button>
         </div>
         <div class="modal-actions" style="margin-top:0.5rem;">
-            <button class="btn-sent-confirm" onclick="confirmReminderSent()"><i class="lucide-check"></i> Rappel envoyé</button>
-            <button class="btn-response-received" onclick="confirmReminderResponseReceived()"><i class="lucide-mail-check"></i> Réponse reçue</button>
+            <button class="btn-sent-confirm" onclick="confirmReminderSent()"><i class="icon-check"></i> Rappel envoyé</button>
+            <button class="btn-response-received" onclick="confirmReminderResponseReceived()"><i class="icon-mail-check"></i> Réponse reçue</button>
         </div>
     </div>
 </div>
@@ -1051,12 +1129,12 @@
 <!-- Accounts Modal -->
 <div class="modal-overlay" id="accountsModal" onclick="if(event.target===this)closeAccountsModal()">
     <div class="modal" style="max-width:650px">
-        <h2><i class="lucide-user"></i> Comptes POP3 / SMTP</h2>
+        <h2><i class="icon-user"></i> Comptes POP3 / SMTP</h2>
         <div id="accountsList"></div>
         <button class="add-task-btn" onclick="addAccountForm()" style="margin-bottom:1rem">+ Ajouter un compte</button>
         <div class="modal-actions">
             <button onclick="closeAccountsModal()">Annuler</button>
-            <button class="btn-primary" onclick="saveAccountsFromModal()"><i class="lucide-save"></i> Enregistrer</button>
+            <button class="btn-primary" onclick="saveAccountsFromModal()"><i class="icon-save"></i> Enregistrer</button>
         </div>
     </div>
 </div>
@@ -1064,7 +1142,7 @@
 <!-- Delete Confirm Modal -->
 <div class="modal-overlay" id="deleteMailModal" onclick="if(event.target===this)closeDeleteMailModal()">
     <div class="modal" style="max-width:400px">
-        <h2><i class="lucide-trash-2"></i> Supprimer ce mail ?</h2>
+        <h2><i class="icon-trash-2"></i> Supprimer ce mail ?</h2>
         <p style="color:var(--text-muted);margin-bottom:1rem" id="deleteMailSubject"></p>
         <div class="form-group">
             <label>
@@ -1073,7 +1151,7 @@
         </div>
         <div class="modal-actions">
             <button onclick="closeDeleteMailModal()">Annuler</button>
-            <button class="btn-danger" onclick="confirmDeleteMail()"><i class="lucide-trash-2"></i> Supprimer</button>
+            <button class="btn-danger" onclick="confirmDeleteMail()"><i class="icon-trash-2"></i> Supprimer</button>
         </div>
     </div>
 </div>
@@ -1215,12 +1293,12 @@ function render() {
 function renderHeader() {
     return `
     <header>
-        <h1><i class="lucide-list-checks"></i> Plan d'action</h1>
+        <h1><i class="icon-list-checks"></i> Plan d'action</h1>
         <div class="header-actions">
             <button onclick="toggleEdit()" class="${editMode ? 'active' : ''}">
-                ${editMode ? '<i class="lucide-check"></i> Terminer' : '<i class="lucide-pencil"></i> Éditer'}
+                ${editMode ? '<i class="icon-check"></i> Terminer' : '<i class="icon-pencil"></i> Éditer'}
             </button>
-            <button onclick="openSettings()"><i class="lucide-settings"></i></button>
+            <button onclick="openSettings()"><i class="icon-settings"></i></button>
         </div>
     </header>`;
 }
@@ -1243,8 +1321,8 @@ function renderSections() {
     return state.sections.map(s => {
         const tasksHtml = s.tasks.map(t => renderTask(t, s.id)).join('');
         const editBtns = editMode ? `
-            <button class="btn-icon" onclick="event.stopPropagation();openSectionModal('${s.id}')" title="Modifier"><i class="lucide-pencil"></i></button>
-            <button class="btn-icon" onclick="event.stopPropagation();deleteSection('${s.id}')" title="Supprimer"><i class="lucide-trash-2"></i></button>
+            <button class="btn-icon" onclick="event.stopPropagation();openSectionModal('${s.id}')" title="Modifier"><i class="icon-pencil"></i></button>
+            <button class="btn-icon" onclick="event.stopPropagation();deleteSection('${s.id}')" title="Supprimer"><i class="icon-trash-2"></i></button>
         ` : '';
         const desc = s.description
             ? `<p class="section-desc" data-desc="${s.id}" ${s.collapsed ? 'style="display:none"' : ''}>${esc(s.description)}</p>`
@@ -1252,7 +1330,7 @@ function renderSections() {
         const addBtns = editMode
             ? `<div class="add-task-buttons">
                 <button onclick="addTask('${s.id}','task')">+ Tâche</button>
-                <button class="mail-btn" onclick="addTask('${s.id}','mail')"><i class="lucide-mail"></i> + Mail</button>
+                <button class="mail-btn" onclick="addTask('${s.id}','mail')"><i class="icon-mail"></i> + Mail</button>
                </div>`
             : '';
         return `
@@ -1292,7 +1370,7 @@ function renderTask(t, sid) {
 
     if (editMode) {
         const typeBadge = (t.type === 'mail' || t.isMail)
-            ? '<span class="task-type-badge"><i class="lucide-mail"></i> Mail</span>'
+            ? '<span class="task-type-badge"><i class="icon-mail"></i> Mail</span>'
             : '';
         return `
         <div class="${cls}" data-sid="${sid}" data-tid="${t.id}" draggable="true">
@@ -1309,7 +1387,7 @@ function renderTask(t, sid) {
             <div class="edit-actions">
                 ${typeBadge}
                 <button class="btn-icon" onclick="toggleIndent('${sid}','${t.id}')" title="Indenter / Désindenter">↔</button>
-                <button class="btn-icon" onclick="deleteTask('${sid}','${t.id}')" title="Supprimer"><i class="lucide-trash-2"></i></button>
+                <button class="btn-icon" onclick="deleteTask('${sid}','${t.id}')" title="Supprimer"><i class="icon-trash-2"></i></button>
             </div>
         </div>`;
     }
@@ -1758,11 +1836,11 @@ async function runV3() {
             outEl.textContent = result.output || 'Terminé (aucune sortie)';
             showToast('v3.py exécuté avec succès !', 'success');
         } else {
-            outEl.textContent = 'rreur :\n' + (result.error || result.output || 'Erreur inconnue');
+            outEl.textContent = 'Erreur :\n' + (result.error || result.output || 'Erreur inconnue');
             showToast('Erreur v3.py', 'error', 3000);
         }
     } catch (e) {
-        outEl.textContent = 'rreur réseau : ' + e.message;
+        outEl.textContent = 'Erreur réseau : ' + e.message;
         showToast('Erreur : ' + e.message, 'error', 5000);
     }
 }
@@ -1820,9 +1898,9 @@ function renderMailList() {
 
     if (!mails.length) {
         container.innerHTML = `
-            <h2><i class="lucide-mail"></i> Mails à traiter</h2>
+            <h2><i class="icon-mail"></i> Mails à traiter</h2>
             <div class="mail-pending-empty">
-                Aucun mail à traiter. Crée un mail depuis l'onglet Todo<br>(mode édition → <strong><i class="lucide-mail"></i> + Mail</strong>).
+                Aucun mail à traiter. Crée un mail depuis l'onglet Todo<br>(mode édition → <strong><i class="icon-mail"></i> + Mail</strong>).
             </div>`;
         return;
     }
@@ -1831,7 +1909,7 @@ function renderMailList() {
     const waiting = mails.filter(m => m.sentAt && !m.respondedAt);
     const responded = mails.filter(m => m.respondedAt);
 
-    let html = '<h2><i class="lucide-mail"></i> Mails à traiter</h2>';
+    let html = '<h2><i class="icon-mail"></i> Mails à traiter</h2>';
     if (pending.length) html += renderMailGroup('À envoyer', pending);
     if (waiting.length) html += renderMailGroup('En attente de réponse', waiting);
     if (responded.length) html += renderMailGroup('Terminés', responded);
@@ -1850,7 +1928,7 @@ function renderMailGroup(title, mails) {
 
         let actionsHtml = '';
         if (status === 'sent' || status === 'waiting') {
-            actionsHtml += `<button onclick="event.stopPropagation();markResponseReceived('${m.sectionId}','${m.id}')" title="Réponse reçue"><i class="lucide-check"></i></button>`;
+            actionsHtml += `<button onclick="event.stopPropagation();markResponseReceived('${m.sectionId}','${m.id}')" title="Réponse reçue"><i class="icon-check"></i></button>`;
         }
 
         return `
@@ -1920,17 +1998,17 @@ function updateMailComposerState() {
             const status = getMailTaskStatus(t);
             banner.innerHTML = `
                 <div class="selected-task-banner">
-                    <span><i class="lucide-mail"></i> <strong>${esc(t.label || 'Sans titre')}</strong></span>
+                    <span><i class="icon-mail"></i> <strong>${esc(t.label || 'Sans titre')}</strong></span>
                     ${status !== 'pending' ? `<span class="mail-item-status ${status}" style="margin-left:0.5rem">${getMailStatusLabel(status)}</span>` : ''}
                     <button class="deselect-btn" onclick="deselectMailTask()">✕</button>
                 </div>`;
             if (sentActions) {
                 if (!t.sentAt) {
                     sentActions.style.display = '';
-                    sentActions.innerHTML = `<button class="btn-sent-confirm" onclick="markCurrentMailSent()"><i class="lucide-check"></i> Marquer comme envoyé</button>`;
+                    sentActions.innerHTML = `<button class="btn-sent-confirm" onclick="markCurrentMailSent()"><i class="icon-check"></i> Marquer comme envoyé</button>`;
                 } else if (!t.respondedAt) {
                     sentActions.style.display = '';
-                    sentActions.innerHTML = `<button class="btn-response-received" onclick="markCurrentResponseReceived()"><i class="lucide-mail-check"></i> Réponse reçue</button>`;
+                    sentActions.innerHTML = `<button class="btn-response-received" onclick="markCurrentResponseReceived()"><i class="icon-mail-check"></i> Réponse reçue</button>`;
                 } else {
                     sentActions.style.display = 'none';
                 }
@@ -2082,7 +2160,7 @@ function renderTimeline() {
 
     let html = `
         <div class="timeline-header">
-            <h2><i class="lucide-calendar"></i> ${esc(monthName.charAt(0).toUpperCase() + monthName.slice(1))}</h2>
+            <h2><i class="icon-calendar"></i> ${esc(monthName.charAt(0).toUpperCase() + monthName.slice(1))}</h2>
             <div class="timeline-nav">
                 <button onclick="navigateTimeline(-1)">◀</button>
                 <button onclick="navigateTimeline(0)">Aujourd'hui</button>
@@ -2202,17 +2280,17 @@ function showTimelinePopover(evt, dateStr) {
         html += `<div class="timeline-popover-actions">`;
 
         if (e.isReminder && e.dotClass === 'reminder-due') {
-            html += `<button onclick="handleDueReminder('${e.reminderId}')"><i class="lucide-sparkles"></i> Générer relance IA</button>`;
-            html += `<button onclick="markReminderResponseReceived('${e.reminderId}')"><i class="lucide-check"></i> Réponse reçue</button>`;
-            html += `<button onclick="editReminderDate('${e.reminderId}')"><i class="lucide-calendar"></i> Modifier la date</button>`;
-            html += `<button class="danger" onclick="dismissReminderFromTimeline('${e.reminderId}')"><i class="lucide-trash-2"></i> Supprimer</button>`;
+            html += `<button onclick="handleDueReminder('${e.reminderId}')"><i class="icon-sparkles"></i> Générer relance IA</button>`;
+            html += `<button onclick="markReminderResponseReceived('${e.reminderId}')"><i class="icon-check"></i> Réponse reçue</button>`;
+            html += `<button onclick="editReminderDate('${e.reminderId}')"><i class="icon-calendar"></i> Modifier la date</button>`;
+            html += `<button class="danger" onclick="dismissReminderFromTimeline('${e.reminderId}')"><i class="icon-trash-2"></i> Supprimer</button>`;
         } else if (e.isReminder && e.dotClass === 'reminder-pending') {
-            html += `<button onclick="handleDueReminder('${e.reminderId}')"><i class="lucide-sparkles"></i> Traiter maintenant</button>`;
-            html += `<button onclick="markReminderResponseReceived('${e.reminderId}')"><i class="lucide-check"></i> Réponse reçue</button>`;
-            html += `<button onclick="editReminderDate('${e.reminderId}')"><i class="lucide-calendar"></i> Modifier la date</button>`;
-            html += `<button class="danger" onclick="dismissReminderFromTimeline('${e.reminderId}')"><i class="lucide-trash-2"></i> Supprimer</button>`;
+            html += `<button onclick="handleDueReminder('${e.reminderId}')"><i class="icon-sparkles"></i> Traiter maintenant</button>`;
+            html += `<button onclick="markReminderResponseReceived('${e.reminderId}')"><i class="icon-check"></i> Réponse reçue</button>`;
+            html += `<button onclick="editReminderDate('${e.reminderId}')"><i class="icon-calendar"></i> Modifier la date</button>`;
+            html += `<button class="danger" onclick="dismissReminderFromTimeline('${e.reminderId}')"><i class="icon-trash-2"></i> Supprimer</button>`;
         } else if (e.type === 'sent' || e.type === 'reminder_sent') {
-            html += `<button onclick="selectMailForCompose('${e.sectionId}','${e.taskId}')"><i class="lucide-mail"></i> Voir le mail</button>`;
+            html += `<button onclick="selectMailForCompose('${e.sectionId}','${e.taskId}')"><i class="icon-mail"></i> Voir le mail</button>`;
         }
 
         html += `</div></div>`;
@@ -2443,7 +2521,7 @@ function updateMailBadge() {
     const total = pending.length + dueReminders.length;
     const tabBtn = document.querySelectorAll('.tab-btn')[1];
     if (tabBtn) {
-        tabBtn.innerHTML = total > 0 ? `<i class="lucide-send"></i> Mail <span style="font-size:0.7em;color:var(--accent-orange)">● ${total}</span>` : '<i class="lucide-send"></i> Mail';
+        tabBtn.innerHTML = total > 0 ? `<i class="icon-send"></i> Mail <span style="font-size:0.7em;color:var(--accent-orange)">● ${total}</span>` : '<i class="icon-send"></i> Mail';
     }
 }
 
@@ -2593,7 +2671,7 @@ function renderInboxList() {
                 </div>
                 <div class="inbox-item-subject">${esc(m.subject || 'Sans sujet')}</div>
                 <div class="inbox-item-preview">${esc(preview)}</div>
-                ${hasAttach ? '<div class="inbox-item-attach"><i class="lucide-paperclip"></i> ' + m.attachments.length + ' pièce(s) jointe(s)</div>' : ''}
+                ${hasAttach ? '<div class="inbox-item-attach"><i class="icon-paperclip"></i> ' + m.attachments.length + ' pièce(s) jointe(s)</div>' : ''}
             </div>
         </div>`;
     }).join('');
@@ -2628,7 +2706,7 @@ function renderInboxReader(mail) {
 
     const attachHtml = mail.attachments && mail.attachments.length > 0
         ? `<div class="inbox-reader-attach">
-            <h4><i class="lucide-paperclip"></i> Pièces jointes</h4>
+            <h4><i class="icon-paperclip"></i> Pièces jointes</h4>
             ${mail.attachments.map(a => `<span class="att-item">${esc(a)}</span>`).join('')}
            </div>`
         : '';
@@ -2644,11 +2722,11 @@ function renderInboxReader(mail) {
                 <span><strong>Compte :</strong> ${esc(mail.account || '')}</span>
             </div>
             <div class="inbox-reader-actions">
-                <button onclick="replyToMail('${esc(mail.id)}')"><i class="lucide-reply"></i> Répondre</button>
-                <button onclick="forwardMail('${esc(mail.id)}')"><i class="lucide-forward"></i> Transférer</button>
-                <button onclick="exportMailObsidian('${esc(mail.id)}')"><i class="lucide-book-open"></i> Exporter</button>
-                <button onclick="toggleInboxRead('${esc(mail.id)}')">${mail.read ? '<i class="lucide-mail-open"></i> Marquer non lu' : '<i class="lucide-mail"></i> Marquer lu'}</button>
-                <button class="danger" onclick="openDeleteMailModal('${esc(mail.id)}')"><i class="lucide-trash-2"></i> Supprimer</button>
+                <button onclick="replyToMail('${esc(mail.id)}')"><i class="icon-reply"></i> Répondre</button>
+                <button onclick="forwardMail('${esc(mail.id)}')"><i class="icon-forward"></i> Transférer</button>
+                <button onclick="exportMailObsidian('${esc(mail.id)}')"><i class="icon-book-open"></i> Exporter</button>
+                <button onclick="toggleInboxRead('${esc(mail.id)}')">${mail.read ? '<i class="icon-mail-open"></i> Marquer non lu' : '<i class="icon-mail"></i> Marquer lu'}</button>
+                <button class="danger" onclick="openDeleteMailModal('${esc(mail.id)}')"><i class="icon-trash-2"></i> Supprimer</button>
             </div>
         </div>
         <div class="inbox-reader-body">${esc(mail.body || '(aucun contenu)')}</div>
@@ -2669,7 +2747,7 @@ async function fetchEmails() {
         const result = await r.json();
         if (result.error) {
             statusEl.className = 'inbox-status error';
-            statusEl.textContent = ' + result.error;
+            statusEl.textContent = 'Erreur : ' + result.error;
         } else {
             await loadInbox();
             const errStr = result.errors && result.errors.length
@@ -2680,7 +2758,7 @@ async function fetchEmails() {
         }
     } catch (e) {
         statusEl.className = 'inbox-status error';
-        statusEl.textContent = 'rreur réseau : ' + e.message;
+        statusEl.textContent = 'Erreur réseau : ' + e.message;
     }
 
     setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
@@ -2760,10 +2838,10 @@ async function exportMailObsidian(mailId) {
         if (result.ok) {
             showToast('Exporté vers Obsidian !', 'success', 3000);
         } else {
-            showToast(' + (result.error || 'Erreur'), 'error', 5000);
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
         }
     } catch (e) {
-        showToast(' + e.message, 'error', 5000);
+        showToast('Erreur : ' + e.message, 'error', 5000);
     } finally {
         hideLoading();
     }
@@ -2780,10 +2858,10 @@ async function exportAllObsidian() {
                 : '';
             showToast(`${result.exported} mail(s) exporté(s)${errStr}`, 'success', 3000);
         } else {
-            showToast(' + (result.error || 'Erreur'), 'error', 5000);
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
         }
     } catch (e) {
-        showToast(' + e.message, 'error', 5000);
+        showToast('Erreur : ' + e.message, 'error', 5000);
     } finally {
         hideLoading();
     }
@@ -2823,7 +2901,7 @@ async function confirmDeleteMail() {
                 selectedInboxId = null;
                 document.getElementById('inboxReader').innerHTML = `
                     <div class="inbox-reader-empty">
-                        <i class="lucide-mail-open" style="font-size:2.5rem;color:var(--text-muted)"></i>
+                        <i class="icon-mail-open" style="font-size:2.5rem;color:var(--text-muted)"></i>
                         <p>Sélectionne un mail pour le lire</p>
                     </div>`;
             }
@@ -2831,10 +2909,10 @@ async function confirmDeleteMail() {
             updateInboxBadge();
             showToast('Mail supprimé', 'success');
         } else {
-            showToast(' + (result.error || 'Erreur'), 'error', 5000);
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
         }
     } catch (e) {
-        showToast(' + e.message, 'error', 5000);
+        showToast('Erreur : ' + e.message, 'error', 5000);
     } finally {
         hideLoading();
     }
@@ -2847,7 +2925,7 @@ function updateInboxBadge() {
     const unread = inboxMails.filter(m => !m.read).length;
     const tabBtn = document.querySelectorAll('.tab-btn')[1];
     if (tabBtn) {
-        tabBtn.innerHTML = unread > 0 ? `<i class="lucide-inbox"></i> Inbox <span style="font-size:0.75em;color:var(--accent-blue)">(${unread})</span>` : '<i class="lucide-inbox"></i> Inbox';
+        tabBtn.innerHTML = unread > 0 ? `<i class="icon-inbox"></i> Inbox <span style="font-size:0.75em;color:var(--accent-blue)">(${unread})</span>` : '<i class="icon-inbox"></i> Inbox';
     }
 }
 
@@ -2962,10 +3040,10 @@ async function saveAccountsFromModal() {
             // Update the mail composer's From dropdown
             updateMailFromOptions();
         } else {
-            showToast(' + (result.error || 'Erreur'), 'error', 5000);
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
         }
     } catch (e) {
-        showToast(' + e.message, 'error', 5000);
+        showToast('Erreur : ' + e.message, 'error', 5000);
     }
 }
 
@@ -3007,10 +3085,10 @@ async function sendMailSMTP() {
         if (result.ok) {
             showToast('Mail envoyé !', 'success', 3000);
         } else {
-            showToast(' + (result.error || 'Erreur'), 'error', 5000);
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
         }
     } catch (e) {
-        showToast(' + e.message, 'error', 5000);
+        showToast('Erreur : ' + e.message, 'error', 5000);
     } finally {
         hideLoading();
     }
@@ -3086,156 +3164,167 @@ if (window.electronAPI) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   Vault Graph (Cytoscape.js)
+   Vault Graph (D3.js force-directed — local IPC scan)
    ═══════════════════════════════════════════════════════ */
-let cyInstance = null;
+let d3Sim = null;
 let graphData = null;
 let graphHiddenGroups = new Set();
+let d3Zoom = null;
+let d3SvgG = null;
+let graphNodeMap = {};
+let selectedGraphNode = null;
 
-const GROUP_COLORS = {
-    mail: '#63b3ed',
-    md: '#68d391',
-    attachment: '#ed8936',
-    orphan: '#a0aec0'
-};
+const GROUP_COLORS = { mail: '#89b4fa', md: '#a6e3a1', attachment: '#fab387', orphan: '#6c7086' };
 
 async function initGraphIfNeeded() {
-    if (cyInstance) return;
+    if (d3Sim) return;
+    const svg = document.getElementById('graphSvg');
+    if (!svg) return;
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#6c7086" font-size="13">Chargement du coffre…</text>';
     try {
-        const r = await fetch('/api/vault/graph');
-        if (!r.ok) throw new Error('Failed to load graph');
-        graphData = await r.json();
-        buildCytoscape();
+        const api = window.electronAPI;
+        if (api && api.scanVaultGraph) {
+            graphData = await api.scanVaultGraph();
+        } else {
+            const r = await fetch('/api/vault/graph');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            graphData = await r.json();
+        }
+        if (graphData.error) throw new Error(graphData.error);
+        buildD3Graph();
         buildNodeList();
+        updateGraphStats();
     } catch (err) {
         console.error('Graph load error:', err);
-        document.getElementById('cy').innerHTML =
-            '<p style="padding:2rem;color:var(--text-muted)">Erreur de chargement du graphe.</p>';
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#f38ba8" font-size="12">Erreur : ' + err.message + '</text>';
     }
 }
 
-function buildCytoscape() {
-    const elements = [];
-    for (const n of graphData.nodes) {
-        elements.push({
-            data: {
-                id: n.id, label: n.label, group: n.group,
-                path: n.path || '', tags: (n.tags || []).join(', ')
-            }
+function buildD3Graph() {
+    const svg = d3.select('#graphSvg');
+    svg.selectAll('*').remove();
+    const rect = svg.node().getBoundingClientRect();
+    const W = rect.width || 800, H = rect.height || 600;
+
+    // Build node map for quick lookup
+    graphNodeMap = {};
+    graphData.nodes.forEach(n => { graphNodeMap[n.id] = n; });
+
+    // Clone data for D3 (it mutates objects)
+    const nodes = graphData.nodes.map(n => ({ ...n }));
+    const nodeIndex = {};
+    nodes.forEach((n, i) => { nodeIndex[n.id] = i; });
+    const links = graphData.edges
+        .filter(e => e.source in nodeIndex && e.target in nodeIndex)
+        .map(e => ({ source: e.source, target: e.target }));
+
+    // Zoom behavior
+    d3Zoom = d3.zoom().scaleExtent([0.05, 8]).on('zoom', (event) => {
+        d3SvgG.attr('transform', event.transform);
+    });
+    svg.call(d3Zoom);
+
+    d3SvgG = svg.append('g');
+
+    // Links
+    const link = d3SvgG.append('g').attr('class', 'links')
+        .selectAll('line').data(links).join('line')
+        .attr('stroke', '#313244').attr('stroke-width', 0.6).attr('opacity', 0.5);
+
+    // Nodes
+    const node = d3SvgG.append('g').attr('class', 'nodes')
+        .selectAll('circle').data(nodes).join('circle')
+        .attr('r', d => d.type === 'orphan' ? 3 : (d.type === 'attachment' ? 4 : 5))
+        .attr('fill', d => GROUP_COLORS[d.group] || '#6c7086')
+        .attr('stroke', '#1e1e2e').attr('stroke-width', 0.5)
+        .attr('cursor', 'pointer')
+        .on('click', (event, d) => {
+            event.stopPropagation();
+            onNodeClick(d, nodes, links);
+        })
+        .call(d3.drag()
+            .on('start', (event, d) => { if (!event.active) d3Sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+            .on('end', (event, d) => { if (!event.active) d3Sim.alphaTarget(0); d.fx = null; d.fy = null; })
+        );
+
+    // Labels (only for larger nodes)
+    const label = d3SvgG.append('g').attr('class', 'labels')
+        .selectAll('text').data(nodes).join('text')
+        .text(d => d.label.length > 25 ? d.label.slice(0, 22) + '…' : d.label)
+        .attr('font-size', 7).attr('fill', '#6c7086')
+        .attr('text-anchor', 'middle').attr('dy', d => (d.type === 'orphan' ? 8 : 12))
+        .attr('pointer-events', 'none')
+        .style('display', d => d.type === 'orphan' ? 'none' : null);
+
+    // Click on background to deselect
+    svg.on('click', () => { clearGraphHighlight(nodes, links); closeGraphReader(); });
+
+    // Force simulation
+    d3Sim = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(60))
+        .force('charge', d3.forceManyBody().strength(-50).distanceMax(300))
+        .force('center', d3.forceCenter(W / 2, H / 2))
+        .force('collision', d3.forceCollide().radius(8))
+        .on('tick', () => {
+            link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+            node.attr('cx', d => d.x).attr('cy', d => d.y);
+            label.attr('x', d => d.x).attr('y', d => d.y);
         });
-    }
-    for (const e of graphData.edges) {
-        elements.push({ data: { source: e.source, target: e.target } });
-    }
 
-    cyInstance = cytoscape({
-        container: document.getElementById('cy'),
-        elements,
-        style: [
-            {
-                selector: 'node',
-                style: {
-                    'label': 'data(label)',
-                    'font-size': 9,
-                    'color': '#cbd5e0',
-                    'text-valign': 'bottom',
-                    'text-margin-y': 4,
-                    'width': 18, 'height': 18,
-                    'background-color': '#a0aec0',
-                    'border-width': 1,
-                    'border-color': '#4a5568',
-                    'text-max-width': 80,
-                    'text-wrap': 'ellipsis'
-                }
-            },
-            {
-                selector: 'node[group="mail"]',
-                style: { 'background-color': GROUP_COLORS.mail }
-            },
-            {
-                selector: 'node[group="md"]',
-                style: { 'background-color': GROUP_COLORS.md }
-            },
-            {
-                selector: 'node[group="attachment"]',
-                style: { 'background-color': GROUP_COLORS.attachment }
-            },
-            {
-                selector: 'node[group="orphan"]',
-                style: { 'background-color': GROUP_COLORS.orphan, 'border-style': 'dashed' }
-            },
-            {
-                selector: 'node:selected',
-                style: {
-                    'border-width': 2, 'border-color': '#f6e05e',
-                    'width': 24, 'height': 24
-                }
-            },
-            {
-                selector: 'edge',
-                style: {
-                    'width': 0.8, 'line-color': '#2d3748',
-                    'curve-style': 'bezier', 'opacity': 0.5
-                }
-            },
-            {
-                selector: '.highlighted',
-                style: {
-                    'border-width': 3, 'border-color': '#f6e05e',
-                    'width': 26, 'height': 26, 'z-index': 10
-                }
-            },
-            {
-                selector: '.dimmed',
-                style: { 'opacity': 0.15 }
-            }
-        ],
-        layout: {
-            name: 'cose',
-            animate: false,
-            nodeRepulsion: 8000,
-            idealEdgeLength: 80,
-            gravity: 0.25,
-            numIter: 500
-        },
-        minZoom: 0.1,
-        maxZoom: 5,
-        wheelSensitivity: 0.3
-    });
-
-    cyInstance.on('tap', 'node', async function (evt) {
-        const node = evt.target;
-        const path = node.data('path');
-        highlightNeighbors(node);
-        selectNodeInList(node.id());
-        if (path) {
-            await openGraphReader(node.data('label'), path);
-        } else {
-            document.getElementById('graphReaderTitle').textContent = node.data('label');
-            document.getElementById('graphReaderBody').textContent = '(noeud orphelin — pas de fichier)';
-            document.getElementById('graphReader').classList.add('open');
-        }
-    });
-
-    cyInstance.on('tap', function (evt) {
-        if (evt.target === cyInstance) {
-            clearHighlight();
-            closeGraphReader();
-        }
-    });
+    // Store references for highlighting
+    svg.node().__d3refs = { node, link, label, nodes, links };
 }
 
-function highlightNeighbors(node) {
-    clearHighlight();
-    const neighborhood = node.neighborhood().add(node);
-    cyInstance.elements().addClass('dimmed');
-    neighborhood.removeClass('dimmed');
-    node.addClass('highlighted');
+function onNodeClick(d, nodes, links) {
+    selectedGraphNode = d.id;
+    selectNodeInList(d.id);
+    highlightGraphNode(d, nodes, links);
+    if (d.path) {
+        openGraphReader(d.label, d.path);
+    } else {
+        document.getElementById('graphReaderTitle').textContent = d.label;
+        document.getElementById('graphReaderBody').textContent = '(noeud orphelin — pas de fichier)';
+        document.getElementById('graphReader').classList.add('open');
+    }
 }
 
-function clearHighlight() {
-    if (!cyInstance) return;
-    cyInstance.elements().removeClass('dimmed').removeClass('highlighted');
+function highlightGraphNode(d, nodes, links) {
+    const svg = d3.select('#graphSvg');
+    const refs = svg.node().__d3refs;
+    if (!refs) return;
+    const neighborIds = new Set([d.id]);
+    links.forEach(l => {
+        const src = typeof l.source === 'object' ? l.source.id : l.source;
+        const tgt = typeof l.target === 'object' ? l.target.id : l.target;
+        if (src === d.id) neighborIds.add(tgt);
+        if (tgt === d.id) neighborIds.add(src);
+    });
+    refs.node.attr('opacity', n => neighborIds.has(n.id) ? 1 : 0.1)
+        .attr('r', n => n.id === d.id ? 8 : (n.type === 'orphan' ? 3 : (n.type === 'attachment' ? 4 : 5)));
+    refs.link.attr('opacity', l => {
+        const src = typeof l.source === 'object' ? l.source.id : l.source;
+        const tgt = typeof l.target === 'object' ? l.target.id : l.target;
+        return (src === d.id || tgt === d.id) ? 0.8 : 0.05;
+    }).attr('stroke', l => {
+        const src = typeof l.source === 'object' ? l.source.id : l.source;
+        const tgt = typeof l.target === 'object' ? l.target.id : l.target;
+        return (src === d.id || tgt === d.id) ? '#89b4fa' : '#313244';
+    });
+    refs.label.attr('opacity', n => neighborIds.has(n.id) ? 1 : 0.1)
+        .style('display', n => neighborIds.has(n.id) ? null : 'none');
+}
+
+function clearGraphHighlight(nodes, links) {
+    selectedGraphNode = null;
+    const svg = d3.select('#graphSvg');
+    const refs = svg.node()?.__d3refs;
+    if (!refs) return;
+    refs.node.attr('opacity', 1).attr('r', d => d.type === 'orphan' ? 3 : (d.type === 'attachment' ? 4 : 5));
+    refs.link.attr('opacity', 0.5).attr('stroke', '#313244');
+    refs.label.attr('opacity', 1).style('display', d => d.type === 'orphan' ? 'none' : null);
+    document.querySelectorAll('#graphNodeList .node-item').forEach(el => el.classList.remove('active'));
 }
 
 async function openGraphReader(title, relpath) {
@@ -3244,22 +3333,32 @@ async function openGraphReader(title, relpath) {
     document.getElementById('graphReaderBody').textContent = 'Chargement…';
     panel.classList.add('open');
     try {
-        const r = await fetch('/api/vault/read?path=' + encodeURIComponent(relpath));
-        const data = await r.json();
+        const api = window.electronAPI;
+        let data;
+        if (api && api.readVaultFile) {
+            data = await api.readVaultFile(relpath);
+        } else {
+            const r = await fetch('/api/vault/read?path=' + encodeURIComponent(relpath));
+            data = await r.json();
+        }
         if (data.ok) {
             document.getElementById('graphReaderBody').textContent = data.content;
         } else {
             document.getElementById('graphReaderBody').textContent = 'Erreur: ' + (data.error || 'fichier introuvable');
         }
     } catch (err) {
-        document.getElementById('graphReaderBody').textContent = 'Erreur réseau.';
+        document.getElementById('graphReaderBody').textContent = 'Erreur : ' + err.message;
     }
 }
 
 function closeGraphReader() {
     const panel = document.getElementById('graphReader');
     if (panel) panel.classList.remove('open');
-    clearHighlight();
+    if (d3Sim) {
+        const svg = d3.select('#graphSvg');
+        const refs = svg.node()?.__d3refs;
+        if (refs) clearGraphHighlight(refs.nodes, refs.links);
+    }
 }
 
 function buildNodeList() {
@@ -3271,49 +3370,98 @@ function buildNodeList() {
         div.className = 'node-item';
         div.dataset.id = n.id;
         div.dataset.group = n.group;
-        div.textContent = n.label;
-        div.onclick = () => {
-            if (!cyInstance) return;
-            const cyNode = cyInstance.getElementById(n.id);
-            if (cyNode.length) {
-                cyInstance.animate({ center: { eles: cyNode }, duration: 300 });
-                cyNode.emit('tap');
-            }
-        };
+        div.innerHTML = '<span class="node-type-dot" style="background:' + (GROUP_COLORS[n.group] || '#6c7086') + '"></span>' + esc(n.label);
+        div.onclick = () => focusGraphNode(n.id);
         list.appendChild(div);
     }
+}
+
+function focusGraphNode(nodeId) {
+    const svg = d3.select('#graphSvg');
+    const refs = svg.node()?.__d3refs;
+    if (!refs) return;
+    const target = refs.nodes.find(n => n.id === nodeId);
+    if (!target) return;
+    // Animate zoom to node
+    const svgEl = svg.node();
+    const rect = svgEl.getBoundingClientRect();
+    const transform = d3.zoomIdentity.translate(rect.width / 2, rect.height / 2).scale(2).translate(-target.x, -target.y);
+    svg.transition().duration(500).call(d3Zoom.transform, transform);
+    onNodeClick(target, refs.nodes, refs.links);
 }
 
 function selectNodeInList(nodeId) {
     document.querySelectorAll('#graphNodeList .node-item').forEach(el => {
         el.classList.toggle('active', el.dataset.id === nodeId);
     });
+    // Scroll into view
+    const active = document.querySelector('#graphNodeList .node-item.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+}
+
+function updateGraphStats() {
+    if (!graphData) return;
+    const el = document.getElementById('graphStats');
+    const counts = { md: 0, mail: 0, attachment: 0, orphan: 0 };
+    graphData.nodes.forEach(n => { counts[n.group] = (counts[n.group] || 0) + 1; });
+    el.textContent = counts.md + ' notes · ' + counts.mail + ' mails · ' + counts.attachment + ' fichiers · ' + graphData.edges.length + ' liens';
 }
 
 function filterGraphNodes(query) {
-    const q = query.toLowerCase();
-    document.querySelectorAll('#graphNodeList .node-item').forEach(el => {
+    const q = query.toLowerCase().trim();
+    const list = document.getElementById('graphNodeList');
+    const items = list.querySelectorAll('.node-item');
+    let shown = 0;
+    items.forEach(el => {
         const match = !q || el.textContent.toLowerCase().includes(q);
         const groupHidden = graphHiddenGroups.has(el.dataset.group);
-        el.style.display = (match && !groupHidden) ? '' : 'none';
+        const visible = match && !groupHidden;
+        el.style.display = visible ? '' : 'none';
+        if (visible) shown++;
     });
-    if (cyInstance) {
-        cyInstance.nodes().forEach(n => {
-            const match = !q || n.data('label').toLowerCase().includes(q);
-            const groupHidden = graphHiddenGroups.has(n.data('group'));
-            n.style('display', (match && !groupHidden) ? 'element' : 'none');
-        });
+    document.getElementById('graphSearchResults').textContent = q ? shown + ' résultat(s)' : '';
+    // Also filter D3 graph
+    if (d3Sim) {
+        const svg = d3.select('#graphSvg');
+        const refs = svg.node()?.__d3refs;
+        if (refs) {
+            refs.node.style('display', d => {
+                const match = !q || d.label.toLowerCase().includes(q);
+                const hidden = graphHiddenGroups.has(d.group);
+                return (match && !hidden) ? null : 'none';
+            });
+            refs.label.style('display', d => {
+                const match = !q || d.label.toLowerCase().includes(q);
+                const hidden = graphHiddenGroups.has(d.group);
+                return (match && !hidden && d.type !== 'orphan') ? null : 'none';
+            });
+            refs.link.style('display', l => {
+                const src = typeof l.source === 'object' ? l.source : { id: l.source };
+                const tgt = typeof l.target === 'object' ? l.target : { id: l.target };
+                const srcVis = (!q || src.label?.toLowerCase().includes(q)) && !graphHiddenGroups.has(src.group);
+                const tgtVis = (!q || tgt.label?.toLowerCase().includes(q)) && !graphHiddenGroups.has(tgt.group);
+                return (srcVis && tgtVis) ? null : 'none';
+            });
+        }
     }
 }
 
 function toggleGraphGroup(checkbox) {
     const group = checkbox.dataset.group;
-    if (checkbox.checked) {
-        graphHiddenGroups.delete(group);
-    } else {
-        graphHiddenGroups.add(group);
-    }
+    if (checkbox.checked) { graphHiddenGroups.delete(group); }
+    else { graphHiddenGroups.add(group); }
     filterGraphNodes(document.getElementById('graphSearchInput').value);
+}
+
+function graphZoom(factor) {
+    const svg = d3.select('#graphSvg');
+    svg.transition().duration(200).call(d3Zoom.scaleBy, factor);
+}
+
+function graphFit() {
+    const svg = d3.select('#graphSvg');
+    const rect = svg.node().getBoundingClientRect();
+    svg.transition().duration(400).call(d3Zoom.transform, d3.zoomIdentity.translate(rect.width / 2, rect.height / 2).scale(0.5).translate(-rect.width / 2, -rect.height / 2));
 }
 
 /* ═══════════════════════════════════════════════════════

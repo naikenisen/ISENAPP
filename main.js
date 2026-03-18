@@ -204,6 +204,92 @@ ipcMain.handle('fs:writeFile', async (_event, relativePath, content) => {
 });
 
 /* ═══════════════════════════════════════════════════════
+   IPC Handlers — Vault Graph (local scan, no HTTP API)
+   ═══════════════════════════════════════════════════════ */
+const VAULT_PATH = '/home/naiken/Documents/obsidian_coffres/isen';
+const WIKILINK_RE = /\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g;
+const ATTACHMENT_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.svg','.pdf','.docx','.xlsx','.pptx','.odt','.csv','.zip']);
+
+function scanVaultGraph() {
+  const nodes = {};
+  const edges = [];
+
+  function walk(dir) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.name === '.obsidian' || entry.name === '.trash') continue;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) { walk(fullPath); continue; }
+      const relpath = path.relative(VAULT_PATH, fullPath);
+      const ext = path.extname(entry.name).toLowerCase();
+      const nameNoExt = path.basename(entry.name, path.extname(entry.name));
+
+      if (ext === '.md') {
+        let tags = [];
+        try {
+          const content = fs.readFileSync(fullPath, 'utf-8').slice(0, 4096);
+          if (content.startsWith('---')) {
+            const end = content.indexOf('---', 3);
+            if (end !== -1) {
+              for (const line of content.slice(3, end).split('\n')) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('- ')) tags.push(trimmed.slice(2).trim());
+              }
+            }
+          }
+        } catch {}
+        const group = relpath.includes('mails/') ? 'mail' : 'md';
+        nodes[nameNoExt] = { id: nameNoExt, label: nameNoExt, path: relpath, type: 'md', tags, group };
+      } else if (ATTACHMENT_EXTS.has(ext)) {
+        nodes[entry.name] = { id: entry.name, label: entry.name, path: relpath, type: 'attachment', tags: [], group: 'attachment' };
+      }
+    }
+  }
+  walk(VAULT_PATH);
+
+  // Extract wikilink edges
+  for (const [name, node] of Object.entries(nodes)) {
+    if (node.type !== 'md') continue;
+    try {
+      const content = fs.readFileSync(path.join(VAULT_PATH, node.path), 'utf-8');
+      let match;
+      WIKILINK_RE.lastIndex = 0;
+      while ((match = WIKILINK_RE.exec(content)) !== null) {
+        const link = match[1].trim();
+        if (link in nodes) {
+          edges.push({ source: name, target: link });
+        } else {
+          if (!(link in nodes)) {
+            nodes[link] = { id: link, label: link, path: '', type: 'orphan', tags: [], group: 'orphan' };
+          }
+          edges.push({ source: name, target: link });
+        }
+      }
+    } catch {}
+  }
+
+  return { nodes: Object.values(nodes), edges };
+}
+
+ipcMain.handle('vault:scanGraph', async () => {
+  try { return scanVaultGraph(); }
+  catch (err) { return { nodes: [], edges: [], error: err.message }; }
+});
+
+ipcMain.handle('vault:readFile', async (_event, relpath) => {
+  const safe = path.normalize(relpath).replace(/^(\.\.[/\\])+/, '');
+  const fullPath = path.join(VAULT_PATH, safe);
+  if (!fullPath.startsWith(VAULT_PATH)) return { ok: false, error: 'Path outside vault' };
+  try {
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    return { ok: true, content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+/* ═══════════════════════════════════════════════════════
    IPC Handlers — Context Menu
    ═══════════════════════════════════════════════════════ */
 ipcMain.on('context-menu:show', (_event, params) => {
