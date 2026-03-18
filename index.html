@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo — Plan d'action</title>
+    <style>
+        /* ─── Variables & Reset ──────────────────────── */
+        :root {
+            --bg: #0f1117;
+            --card: #1a1d2e;
+            --card-border: #2a2d3e;
+            --text: #e2e4eb;
+            --text-muted: #8b8fa3;
+            --accent-blue: #6c8aff;
+            --accent-green: #34d399;
+            --accent-orange: #f59e0b;
+            --accent-purple: #a78bfa;
+            --accent-pink: #f472b6;
+            --accent-slate: #94a3b8;
+            --progress-bg: #252840;
+            --checked: #34d399;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        /* ─── Layout ─────────────────────────────────── */
+        .container { max-width: 900px; margin: 0 auto; }
+
+        /* ─── Header ─────────────────────────────────── */
+        header { text-align: center; margin-bottom: 2.5rem; }
+        header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .header-actions {
+            display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.75rem; flex-wrap: wrap;
+        }
+        .header-actions button {
+            padding: 0.5rem 1rem; border: 1px solid var(--card-border); border-radius: 10px;
+            background: var(--card); color: var(--text-muted); cursor: pointer;
+            font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+        }
+        .header-actions button:hover {
+            background: rgba(108,138,255,0.15); border-color: var(--accent-blue); color: var(--text);
+        }
+        .header-actions button.active {
+            background: rgba(108,138,255,0.2); border-color: var(--accent-blue); color: var(--accent-blue);
+        }
+
+        /* ─── Global Progress ────────────────────────── */
+        .global-progress {
+            background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
+            padding: 1.5rem 2rem; margin-bottom: 2.5rem; position: sticky; top: 1rem; z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+        .global-progress-header {
+            display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem;
+        }
+        .global-progress-header span:first-child { font-weight: 600; font-size: 1rem; }
+        .global-progress-header .counter { font-size: 0.9rem; color: var(--text-muted); }
+        .global-progress-header .counter strong { color: var(--accent-green); }
+        .progress-bar-track {
+            width: 100%; height: 10px; background: var(--progress-bg);
+            border-radius: 99px; overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%; border-radius: 99px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            transition: width 0.5s ease; width: 0%;
+        }
+        .progress-percent { text-align: right; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem; }
+
+        /* ─── Section ────────────────────────────────── */
+        .section {
+            background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
+            margin-bottom: 1.5rem; overflow: hidden; transition: box-shadow 0.3s, outline 0.2s;
+        }
+        .section:hover { box-shadow: 0 0 30px rgba(108,138,255,0.06); }
+        .section-header {
+            padding: 1.25rem 1.5rem; display: flex; justify-content: space-between;
+            align-items: center; cursor: pointer; user-select: none;
+        }
+        .section-header:hover { background: rgba(255,255,255,0.02); }
+        body.edit-mode .section-header { cursor: default; }
+        body.edit-mode .section-header:hover { background: transparent; }
+        .section-title { font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+        .section-badge {
+            font-size: 0.75rem; padding: 0.15rem 0.6rem; border-radius: 99px; font-weight: 600;
+        }
+        .section-desc {
+            padding: 0 1.5rem; font-size: 0.85rem; color: var(--text-muted);
+            font-style: italic; margin-bottom: 0.5rem;
+        }
+        .section-header-right { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+        .section-progress-mini { width: 120px; display: flex; align-items: center; gap: 0.6rem; }
+        .section-progress-mini .mini-bar {
+            flex: 1; height: 5px; background: var(--progress-bg); border-radius: 99px; overflow: hidden;
+        }
+        .section-progress-mini .mini-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; width: 0%; }
+        .section-progress-mini .mini-text { font-size: 0.75rem; color: var(--text-muted); min-width: 32px; text-align: right; }
+
+        /* ─── Colors Per Section ─────────────────────── */
+        .section[data-color="blue"] .section-title { color: var(--accent-blue); }
+        .section[data-color="blue"] .section-badge { background: rgba(108,138,255,0.15); color: var(--accent-blue); }
+        .section[data-color="blue"] .mini-fill { background: var(--accent-blue); }
+        .section[data-color="orange"] .section-title { color: var(--accent-orange); }
+        .section[data-color="orange"] .section-badge { background: rgba(245,158,11,0.15); color: var(--accent-orange); }
+        .section[data-color="orange"] .mini-fill { background: var(--accent-orange); }
+        .section[data-color="green"] .section-title { color: var(--accent-green); }
+        .section[data-color="green"] .section-badge { background: rgba(52,211,153,0.15); color: var(--accent-green); }
+        .section[data-color="green"] .mini-fill { background: var(--accent-green); }
+        .section[data-color="purple"] .section-title { color: var(--accent-purple); }
+        .section[data-color="purple"] .section-badge { background: rgba(167,139,250,0.15); color: var(--accent-purple); }
+        .section[data-color="purple"] .mini-fill { background: var(--accent-purple); }
+        .section[data-color="pink"] .section-title { color: var(--accent-pink); }
+        .section[data-color="pink"] .section-badge { background: rgba(244,114,182,0.15); color: var(--accent-pink); }
+        .section[data-color="pink"] .mini-fill { background: var(--accent-pink); }
+        .section[data-color="slate"] .section-title { color: var(--accent-slate); }
+        .section[data-color="slate"] .section-badge { background: rgba(148,163,184,0.15); color: var(--accent-slate); }
+        .section[data-color="slate"] .mini-fill { background: var(--accent-slate); }
+
+        /* ─── Tasks ──────────────────────────────────── */
+        .task-list { padding: 0 1rem 1rem; }
+        .task-item {
+            display: flex; align-items: flex-start; gap: 0.75rem;
+            padding: 0.7rem 0.75rem; border-radius: 10px; transition: background 0.15s;
+        }
+        .task-item:hover { background: rgba(255,255,255,0.025); }
+        .task-item.checked .task-label { text-decoration: line-through; color: var(--text-muted); }
+        .task-item.checked .custom-check { background: var(--checked); border-color: var(--checked); }
+        .task-item.checked .custom-check svg { opacity: 1; }
+        .task-item.sub-task { margin-left: 2rem; }
+        .custom-check {
+            width: 22px; height: 22px; min-width: 22px; border: 2px solid var(--card-border);
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s; margin-top: 2px;
+        }
+        .custom-check:hover { border-color: var(--accent-blue); }
+        .custom-check svg { width: 14px; height: 14px; opacity: 0; transition: opacity 0.2s; stroke: white; stroke-width: 3; fill: none; }
+        .task-label { font-size: 0.95rem; cursor: pointer; flex: 1; transition: color 0.3s; }
+        .task-note { display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem; font-style: italic; }
+
+        /* ─── Edit Mode ──────────────────────────────── */
+        .task-edit-fields { flex: 1; display: flex; flex-direction: column; gap: 0.25rem; }
+        .task-input, .task-note-input {
+            width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--card-border);
+            border-radius: 8px; background: var(--progress-bg); color: var(--text);
+            font-size: 0.9rem; font-family: inherit;
+        }
+        .task-note-input { font-size: 0.8rem; color: var(--text-muted); }
+        .task-input:focus, .task-note-input:focus { outline: none; border-color: var(--accent-blue); }
+        .btn-icon {
+            background: none; border: none; cursor: pointer; font-size: 0.85rem;
+            padding: 0.3rem; opacity: 0.5; transition: opacity 0.2s;
+        }
+        .btn-icon:hover { opacity: 1; }
+        .edit-actions { display: flex; gap: 0.2rem; align-items: flex-start; margin-top: 2px; }
+        .add-task-btn {
+            width: 100%; padding: 0.6rem; border: 1px dashed var(--card-border);
+            border-radius: 10px; background: transparent; color: var(--text-muted);
+            cursor: pointer; font-size: 0.85rem; transition: all 0.2s; margin-top: 0.5rem;
+        }
+        .add-task-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .add-section-btn {
+            width: 100%; padding: 1rem; border: 1px dashed var(--card-border);
+            border-radius: 16px; background: transparent; color: var(--text-muted);
+            cursor: pointer; font-size: 1rem; transition: all 0.2s; margin-top: 1rem;
+        }
+        .add-section-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+        /* ─── Drag & Drop ────────────────────────────── */
+        .task-item[draggable="true"] { cursor: grab; }
+        .task-item.dragging { opacity: 0.3; }
+        .section.drag-over { outline: 2px dashed var(--accent-blue); outline-offset: -2px; }
+
+        /* ─── Modal ──────────────────────────────────── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px);
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
+            padding: 2rem; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;
+        }
+        .modal h2 { margin-bottom: 1.5rem; font-size: 1.2rem; }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 600; }
+        .form-group input[type="text"], .form-group input[type="password"] {
+            width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--card-border);
+            border-radius: 10px; background: var(--progress-bg); color: var(--text);
+            font-size: 0.9rem; font-family: inherit;
+        }
+        .form-group input:focus { outline: none; border-color: var(--accent-blue); }
+        .form-group small { display: block; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; }
+        .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+        .modal-actions button {
+            padding: 0.6rem 1.2rem; border: 1px solid var(--card-border); border-radius: 10px;
+            background: var(--progress-bg); color: var(--text-muted); cursor: pointer;
+            font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+        }
+        .modal-actions button:hover { border-color: var(--accent-blue); color: var(--text); }
+        .btn-primary { background: var(--accent-blue) !important; border-color: var(--accent-blue) !important; color: white !important; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-danger { background: #ef4444 !important; border-color: #ef4444 !important; color: white !important; }
+
+        /* ─── Emoji Picker ───────────────────────────── */
+        .emoji-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 0.3rem; max-height: 200px; overflow-y: auto; }
+        .emoji-btn {
+            width: 36px; height: 36px; border: 1px solid transparent; border-radius: 8px;
+            background: none; cursor: pointer; font-size: 1.2rem;
+            display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+        }
+        .emoji-btn:hover { background: rgba(108,138,255,0.15); }
+        .emoji-btn.selected { background: rgba(108,138,255,0.25); border-color: var(--accent-blue); }
+
+        /* ─── Color Picker ───────────────────────────── */
+        .color-picker { display: flex; gap: 0.75rem; }
+        .color-dot {
+            width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+            border: 3px solid transparent; transition: all 0.2s;
+        }
+        .color-dot:hover { transform: scale(1.15); }
+        .color-dot.selected { border-color: white; transform: scale(1.15); }
+
+        /* ─── Loading ────────────────────────────────── */
+        .loading-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(15,17,23,0.85);
+            z-index: 2000; justify-content: center; align-items: center;
+            flex-direction: column; gap: 1rem; backdrop-filter: blur(8px);
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-spinner {
+            width: 48px; height: 48px; border: 4px solid var(--card-border);
+            border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-overlay p { color: var(--text-muted); font-size: 0.95rem; }
+
+        /* ─── Toast ──────────────────────────────────── */
+        .toast {
+            position: fixed; bottom: 2rem; left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 0.6rem 1.5rem; border-radius: 10px;
+            font-weight: 600; font-size: 0.85rem; opacity: 0;
+            transition: all 0.4s ease; z-index: 10000; pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.success { background: var(--accent-green); color: #0f1117; }
+        .toast.error { background: #ef4444; color: white; }
+
+        /* ─── Confetti ───────────────────────────────── */
+        #confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
+
+        /* ─── Responsive ─────────────────────────────── */
+        @media (max-width: 600px) {
+            body { padding: 1rem 0.5rem; }
+            .section-header { padding: 1rem; }
+            .task-list { padding: 0 0.5rem 0.75rem; }
+            .global-progress { padding: 1rem 1.25rem; }
+            header h1 { font-size: 1.4rem; }
+            .emoji-grid { grid-template-columns: repeat(8, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="confetti"></canvas>
+<div class="container" id="app"></div>
+
+<!-- Section Modal -->
+<div class="modal-overlay" id="sectionModal" onclick="if(event.target===this)closeSectionModal()">
+    <div class="modal">
+        <h2 id="sectionModalTitle">Nouvelle section</h2>
+        <div class="form-group">
+            <label>Emoji</label>
+            <div class="emoji-grid" id="emojiGrid"></div>
+        </div>
+        <div class="form-group">
+            <label>Titre</label>
+            <input type="text" id="sectionTitleInput" placeholder="Nom de la section">
+        </div>
+        <div class="form-group">
+            <label>Badge</label>
+            <input type="text" id="sectionBadgeInput" placeholder="Tag court (ex: Rapide, Deep Work…)">
+        </div>
+        <div class="form-group">
+            <label>Couleur</label>
+            <div class="color-picker" id="colorPicker"></div>
+        </div>
+        <div class="form-group">
+            <label>Description (optionnelle)</label>
+            <input type="text" id="sectionDescInput" placeholder="Description courte…">
+        </div>
+        <div class="modal-actions">
+            <button onclick="closeSectionModal()">Annuler</button>
+            <button class="btn-primary" onclick="saveSectionModal()">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+    <div class="modal">
+        <h2>⚙️ Paramètres</h2>
+        <div class="form-group">
+            <label>Token GitHub (pour l'IA)</label>
+            <input type="password" id="githubTokenInput" placeholder="ghp_... ou github_pat_...">
+            <small>Nécessaire pour le bouton « Organiser ». Stocké localement dans data.json.</small>
+        </div>
+        <div class="modal-actions">
+            <button onclick="closeSettings()">Annuler</button>
+            <button class="btn-primary" onclick="saveSettings()">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading">
+    <div class="loading-spinner"></div>
+    <p>L'IA réorganise tes tâches…</p>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   State & Config
+   ═══════════════════════════════════════════════════════ */
+let state = { sections: [], settings: { githubToken: '' } };
+let editMode = false;
+let editingSectionId = null;
+let dragData = null;
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const EMOJIS = [
+    '📋','📌','📞','💼','🤝','💻','🚀','🗂️','📊','💡',
+    '🎯','🔧','⚡','🏆','📝','✨','🌟','💎','🔬','🎨',
+    '📚','🔔','🏠','💰','🎓','🧪','🌍','🛠️','📦','🎪',
+    '🧩','💬','📐','🔑','🏗️','⏰','🧲','🎶','🖥️','❤️',
+    '🔥','🌈','🍀','💪','🧠','👁️','🎁','📱','🌐','🔗',
+    '💊','🩺','📈','🔒','🛡️','⭐','💫','🎭','🧬','🔎'
+];
+const COLORS = ['blue', 'orange', 'green', 'purple', 'pink', 'slate'];
+const COLOR_HEX = {
+    blue: '#6c8aff', orange: '#f59e0b', green: '#34d399',
+    purple: '#a78bfa', pink: '#f472b6', slate: '#94a3b8'
+};
+let modalEmoji = '📋';
+let modalColor = 'blue';
+
+/* ═══════════════════════════════════════════════════════
+   API Layer
+   ═══════════════════════════════════════════════════════ */
+let saveTimer;
+
+async function loadState() {
+    try {
+        const r = await fetch('/api/state');
+        if (r.ok) {
+            const data = await r.json();
+            if (data.sections) state = data;
+        }
+    } catch {
+        try {
+            const raw = localStorage.getItem('todo-state');
+            if (raw) state = JSON.parse(raw);
+        } catch {}
+    }
+    if (!state.sections) state.sections = [];
+    if (!state.settings) state.settings = { githubToken: '' };
+}
+
+function autoSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+        try {
+            await fetch('/api/state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(state)
+            });
+        } catch {
+            localStorage.setItem('todo-state', JSON.stringify(state));
+        }
+    }, 400);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Rendering
+   ═══════════════════════════════════════════════════════ */
+function render() {
+    const app = document.getElementById('app');
+    const scrollY = window.scrollY;
+    app.innerHTML = renderHeader() + renderProgress() + renderSections()
+        + (editMode ? '<button class="add-section-btn" onclick="openSectionModal()">+ Nouvelle section</button>' : '');
+    updateProgress();
+    setupDragDrop();
+    window.scrollTo(0, scrollY);
+}
+
+function renderHeader() {
+    return `
+    <header>
+        <h1>📋 Plan d'action</h1>
+        <div class="header-actions">
+            <button onclick="toggleEdit()" class="${editMode ? 'active' : ''}">
+                ${editMode ? '✅ Terminer' : '✏️ Éditer'}
+            </button>
+            <button onclick="organize()">🤖 Organiser</button>
+            <button onclick="openSettings()">⚙️</button>
+        </div>
+    </header>`;
+}
+
+function renderProgress() {
+    return `
+    <div class="global-progress">
+        <div class="global-progress-header">
+            <span>Progression globale</span>
+            <span class="counter"><strong id="gDone">0</strong> / <span id="gTotal">0</span> tâches</span>
+        </div>
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="gBar"></div>
+        </div>
+        <div class="progress-percent" id="gPercent">0 %</div>
+    </div>`;
+}
+
+function renderSections() {
+    return state.sections.map(s => {
+        const tasksHtml = s.tasks.map(t => renderTask(t, s.id)).join('');
+        const editBtns = editMode ? `
+            <button class="btn-icon" onclick="event.stopPropagation();openSectionModal('${s.id}')" title="Modifier">✏️</button>
+            <button class="btn-icon" onclick="event.stopPropagation();deleteSection('${s.id}')" title="Supprimer">🗑️</button>
+        ` : '';
+        const desc = s.description
+            ? `<p class="section-desc" data-desc="${s.id}" ${s.collapsed ? 'style="display:none"' : ''}>${esc(s.description)}</p>`
+            : '';
+        const addBtn = editMode
+            ? `<button class="add-task-btn" onclick="addTask('${s.id}')">+ Nouvelle tâche</button>`
+            : '';
+        return `
+        <div class="section" data-color="${esc(s.color)}" data-sid="${s.id}">
+            <div class="section-header" onclick="onSectionClick('${s.id}')">
+                <span class="section-title">
+                    ${s.emoji} ${esc(s.title)}
+                    <span class="section-badge">${esc(s.badge || '')}</span>
+                </span>
+                <div class="section-header-right">
+                    ${editBtns}
+                    <div class="section-progress-mini">
+                        <div class="mini-bar"><div class="mini-fill" data-sfill="${s.id}"></div></div>
+                        <span class="mini-text" data-stext="${s.id}">0%</span>
+                    </div>
+                </div>
+            </div>
+            ${desc}
+            <div class="task-list" data-slist="${s.id}" ${s.collapsed ? 'style="display:none"' : ''}>
+                ${tasksHtml}
+                ${addBtn}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderTask(t, sid) {
+    const cls = [
+        'task-item',
+        t.done ? 'checked' : '',
+        t.indent ? 'sub-task' : ''
+    ].filter(Boolean).join(' ');
+
+    const check = `<div class="custom-check" onclick="toggleTask('${sid}','${t.id}')">
+        <svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div>`;
+
+    if (editMode) {
+        return `
+        <div class="${cls}" data-sid="${sid}" data-tid="${t.id}" draggable="true">
+            ${check}
+            <div class="task-edit-fields">
+                <input type="text" class="task-input" value="${esc(t.label)}"
+                    onchange="updateTask('${sid}','${t.id}','label',this.value)"
+                    onkeydown="if(event.key==='Enter'){this.blur()}">
+                <input type="text" class="task-note-input" value="${esc(t.note || '')}"
+                    placeholder="Note (optionnel)"
+                    onchange="updateTask('${sid}','${t.id}','note',this.value)"
+                    onkeydown="if(event.key==='Enter'){this.blur()}">
+            </div>
+            <div class="edit-actions">
+                <button class="btn-icon" onclick="toggleIndent('${sid}','${t.id}')" title="Indenter / Désindenter">↔</button>
+                <button class="btn-icon" onclick="deleteTask('${sid}','${t.id}')" title="Supprimer">🗑️</button>
+            </div>
+        </div>`;
+    }
+
+    return `
+    <div class="${cls}" data-sid="${sid}" data-tid="${t.id}" draggable="true">
+        ${check}
+        <span class="task-label" onclick="toggleTask('${sid}','${t.id}')">
+            ${esc(t.label)}${t.note ? `<span class="task-note">${esc(t.note)}</span>` : ''}
+        </span>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Progress
+   ═══════════════════════════════════════════════════════ */
+function updateProgress() {
+    let total = 0, done = 0;
+    state.sections.forEach(s => {
+        let st = 0, sd = 0;
+        s.tasks.forEach(t => { st++; total++; if (t.done) { sd++; done++; } });
+        const sp = st ? Math.round((sd / st) * 100) : 0;
+        const fill = document.querySelector(`[data-sfill="${s.id}"]`);
+        const text = document.querySelector(`[data-stext="${s.id}"]`);
+        if (fill) fill.style.width = sp + '%';
+        if (text) text.textContent = sp + '%';
+    });
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const gDone = document.getElementById('gDone');
+    const gTotal = document.getElementById('gTotal');
+    const gBar = document.getElementById('gBar');
+    const gPercent = document.getElementById('gPercent');
+    if (gDone) gDone.textContent = done;
+    if (gTotal) gTotal.textContent = total;
+    if (gBar) gBar.style.width = pct + '%';
+    if (gPercent) gPercent.textContent = pct + ' %';
+    if (pct === 100 && total > 0) launchConfetti();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Task Operations
+   ═══════════════════════════════════════════════════════ */
+function toggleTask(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t) return;
+    t.done = !t.done;
+    const el = document.querySelector(`[data-sid="${sid}"][data-tid="${tid}"]`);
+    if (el) el.classList.toggle('checked', t.done);
+    updateProgress();
+    autoSave();
+}
+
+function updateTask(sid, tid, field, value) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t) return;
+    t[field] = value;
+    autoSave();
+}
+
+function addTask(sid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    s.tasks.push({ id: uid(), label: '', note: '', done: false, indent: 0 });
+    render();
+    autoSave();
+    const inputs = document.querySelectorAll(`[data-sid="${sid}"] .task-input`);
+    if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function deleteTask(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    s.tasks = s.tasks.filter(t => t.id !== tid);
+    render();
+    autoSave();
+}
+
+function toggleIndent(sid, tid) {
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    const t = s.tasks.find(x => x.id === tid);
+    if (!t) return;
+    t.indent = t.indent ? 0 : 1;
+    render();
+    autoSave();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section Operations
+   ═══════════════════════════════════════════════════════ */
+function onSectionClick(sid) {
+    if (editMode) return;
+    const s = state.sections.find(x => x.id === sid);
+    if (!s) return;
+    s.collapsed = !s.collapsed;
+    const list = document.querySelector(`[data-slist="${s.id}"]`);
+    const desc = document.querySelector(`[data-desc="${s.id}"]`);
+    if (list) list.style.display = s.collapsed ? 'none' : '';
+    if (desc) desc.style.display = s.collapsed ? 'none' : '';
+    autoSave();
+}
+
+function deleteSection(sid) {
+    if (!confirm('Supprimer cette section et toutes ses tâches ?')) return;
+    state.sections = state.sections.filter(s => s.id !== sid);
+    render();
+    autoSave();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Edit Mode
+   ═══════════════════════════════════════════════════════ */
+function toggleEdit() {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    render();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Drag & Drop
+   ═══════════════════════════════════════════════════════ */
+function setupDragDrop() {
+    document.querySelectorAll('.task-item[draggable]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            dragData = { sid: el.dataset.sid, tid: el.dataset.tid };
+            el.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', () => {
+            el.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+            dragData = null;
+        });
+    });
+
+    document.querySelectorAll('.section').forEach(sec => {
+        sec.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            sec.classList.add('drag-over');
+        });
+        sec.addEventListener('dragleave', e => {
+            if (!sec.contains(e.relatedTarget)) sec.classList.remove('drag-over');
+        });
+        sec.addEventListener('drop', e => {
+            e.preventDefault();
+            sec.classList.remove('drag-over');
+            if (!dragData) return;
+            const targetSid = sec.dataset.sid;
+            if (dragData.sid === targetSid) return;
+            const from = state.sections.find(s => s.id === dragData.sid);
+            const to = state.sections.find(s => s.id === targetSid);
+            if (!from || !to) return;
+            const idx = from.tasks.findIndex(t => t.id === dragData.tid);
+            if (idx === -1) return;
+            const [task] = from.tasks.splice(idx, 1);
+            to.tasks.push(task);
+            render();
+            autoSave();
+            showToast('Tâche déplacée', 'success', 1500);
+        });
+    });
+}
+
+/* ═══════════════════════════════════════════════════════
+   Section Modal (create / edit + emoji picker)
+   ═══════════════════════════════════════════════════════ */
+function openSectionModal(sid) {
+    editingSectionId = sid || null;
+    const s = sid ? state.sections.find(x => x.id === sid) : null;
+
+    document.getElementById('sectionModalTitle').textContent = s ? 'Modifier la section' : 'Nouvelle section';
+    document.getElementById('sectionTitleInput').value = s ? s.title : '';
+    document.getElementById('sectionBadgeInput').value = s ? (s.badge || '') : '';
+    document.getElementById('sectionDescInput').value = s ? (s.description || '') : '';
+
+    modalEmoji = s ? s.emoji : '📋';
+    modalColor = s ? s.color : 'blue';
+
+    renderEmojiGrid();
+    renderColorPicker();
+    document.getElementById('sectionModal').classList.add('show');
+}
+
+function closeSectionModal() {
+    document.getElementById('sectionModal').classList.remove('show');
+    editingSectionId = null;
+}
+
+function renderEmojiGrid() {
+    document.getElementById('emojiGrid').innerHTML = EMOJIS.map((e, i) =>
+        `<button type="button" class="emoji-btn ${e === modalEmoji ? 'selected' : ''}"
+            onclick="selectEmoji(${i})">${e}</button>`
+    ).join('');
+}
+
+function selectEmoji(idx) {
+    modalEmoji = EMOJIS[idx];
+    renderEmojiGrid();
+}
+
+function renderColorPicker() {
+    document.getElementById('colorPicker').innerHTML = COLORS.map((c, i) =>
+        `<div class="color-dot ${c === modalColor ? 'selected' : ''}"
+            style="background:${COLOR_HEX[c]}" onclick="selectColor(${i})"></div>`
+    ).join('');
+}
+
+function selectColor(idx) {
+    modalColor = COLORS[idx];
+    renderColorPicker();
+}
+
+function saveSectionModal() {
+    const title = document.getElementById('sectionTitleInput').value.trim();
+    if (!title) { document.getElementById('sectionTitleInput').focus(); return; }
+    const badge = document.getElementById('sectionBadgeInput').value.trim();
+    const desc = document.getElementById('sectionDescInput').value.trim();
+
+    if (editingSectionId) {
+        const s = state.sections.find(x => x.id === editingSectionId);
+        if (s) {
+            s.title = title; s.badge = badge; s.description = desc;
+            s.emoji = modalEmoji; s.color = modalColor;
+        }
+    } else {
+        state.sections.push({
+            id: uid(), emoji: modalEmoji, title, badge, color: modalColor,
+            description: desc, collapsed: false, tasks: []
+        });
+    }
+    closeSectionModal();
+    render();
+    autoSave();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Settings Modal
+   ═══════════════════════════════════════════════════════ */
+function openSettings() {
+    document.getElementById('githubTokenInput').value = state.settings.githubToken || '';
+    document.getElementById('settingsModal').classList.add('show');
+}
+
+function closeSettings() {
+    document.getElementById('settingsModal').classList.remove('show');
+}
+
+function saveSettings() {
+    state.settings.githubToken = document.getElementById('githubTokenInput').value.trim();
+    closeSettings();
+    autoSave();
+    showToast('Paramètres sauvegardés', 'success');
+}
+
+/* ═══════════════════════════════════════════════════════
+   AI Organize
+   ═══════════════════════════════════════════════════════ */
+async function organize() {
+    if (!state.settings.githubToken) {
+        showToast('Configure ton token GitHub dans ⚙️', 'error', 3000);
+        openSettings();
+        return;
+    }
+    if (!state.sections.length) {
+        showToast('Aucune tâche à organiser.', 'error');
+        return;
+    }
+    if (!confirm("L'IA va réorganiser toutes tes tâches. Continuer ?")) return;
+
+    document.getElementById('loading').classList.add('show');
+    try {
+        const r = await fetch('/api/organize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: state.settings.githubToken, sections: state.sections })
+        });
+        const result = await r.json();
+        if (result.error) {
+            showToast('Erreur IA : ' + result.error, 'error', 5000);
+            return;
+        }
+        if (result.sections) {
+            result.sections.forEach(s => {
+                if (!s.id) s.id = uid();
+                s.collapsed = false;
+                (s.tasks || []).forEach(t => {
+                    if (!t.id) t.id = uid();
+                    if (t.indent === undefined) t.indent = 0;
+                    if (t.done === undefined) t.done = false;
+                });
+            });
+            state.sections = result.sections;
+            render();
+            autoSave();
+            showToast('Tâches réorganisées !', 'success');
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        document.getElementById('loading').classList.remove('show');
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Toast
+   ═══════════════════════════════════════════════════════ */
+let toastTimer;
+function showToast(msg, type = 'success', duration = 2000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className = 'toast', duration);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Confetti
+   ═══════════════════════════════════════════════════════ */
+function launchConfetti() {
+    const canvas = document.getElementById('confetti');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const particles = [];
+    const colors = ['#6c8aff','#34d399','#f59e0b','#a78bfa','#f472b6','#fff'];
+    for (let i = 0; i < 150; i++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height - canvas.height,
+            r: Math.random() * 6 + 2,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            tilt: Math.random() * 10 - 5,
+            speed: Math.random() * 3 + 2,
+            opacity: 1,
+        });
+    }
+    let frame = 0;
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        particles.forEach(p => {
+            if (p.opacity <= 0) return;
+            alive = true;
+            p.y += p.speed;
+            p.tilt += 0.05;
+            p.opacity -= 0.005;
+            ctx.globalAlpha = Math.max(0, p.opacity);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.ellipse(p.x + Math.sin(p.tilt) * 15, p.y, p.r, p.r * 0.6, p.tilt, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        if (alive && frame < 300) { frame++; requestAnimationFrame(draw); }
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    draw();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Init
+   ═══════════════════════════════════════════════════════ */
+(async function init() {
+    await loadState();
+    render();
+})();
+</script>
+</body>
+</html>

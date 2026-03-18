@@ -1,0 +1,261 @@
+{
+  "sections": [
+    {
+      "id": "ifkelwve",
+      "emoji": "🧪",
+      "title": "Salarié (cadre dans l'industrie pharma et vacations universitaires)",
+      "badge": "",
+      "color": "blue",
+      "description": "",
+      "collapsed": false,
+      "tasks": [
+        {
+          "id": "eeu4m1mm",
+          "label": "soumission TNE au journal 2",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "l2y63yzb",
+          "label": "Créer un portfolio d'experiences",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t32",
+          "label": "Créer une représentation visuelle claire de mes expériences : informatique & pharmacie).",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "tjl05qb1",
+          "label": "demander à Jessica pour accès au service de médecine nucléaire cgfl",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t13",
+          "label": "Envoyer un mail stratégique à Jessica et Stéphanie concernant Guerbet.",
+          "note": "Argumentaire : ils font déjà le RECIST, il leur manque le TMTV — c'est \"rater le coche\" de ne pas collaborer.",
+          "done": true,
+          "indent": 0
+        },
+        {
+          "id": "t05",
+          "label": "Contacter la médecin nucléaire présente à la thèse de Mathilde.",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "zr6mietx",
+          "label": "contacter Marc-Michel Rohe (@guerbet.com)",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "2pgak9nu",
+          "label": "contacter Debs Noelie",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t08",
+          "label": "Contacter Alain Lalande.",
+          "note": "Note : il apparaissait deux fois dans ta liste !",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t07",
+          "label": "Contacter le CEA.",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t20",
+          "label": "⏰ Deadline Fin d'année — Préparer le dépôt de brevet si brevet est nécessaire",
+          "note": "Si le choix de la SATT est validé.",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t19",
+          "label": "Trouver des financements pour la 9e et 10e année (des DSPs).",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t18",
+          "label": "Rechercher des partenariats avec des grandes écoles.",
+          "note": "Voir si cela peut s'inscrire dans un projet plus global du labo.",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t16",
+          "label": "Voir Mathieu pour obtenir des conseils sur l'entrée dans l'industrie.",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t14",
+          "label": "Préparer un NDA (Accord de confidentialité) pour débuter les RDV avec l'industrie.",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "t12",
+          "label": "⏰ Deadline Mi-Avril — Conclure un partenariat industriel.",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "ium3zxj7",
+          "label": "Organiser mes repos sur github et ouvir des issues pour coder proprement",
+          "note": "",
+          "done": true,
+          "indent": 0
+        },
+        {
+          "id": "fbvkh3d6",
+          "label": "Prendre mon train Paris",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "zy6v0sek",
+          "label": " relancer fagnoni en lui disant que je dois me rapporcher de inserm strasbourg ",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "5u13raxg",
+          "label": "relancer boulin",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "n0d2lk5y",
+          "label": "relancer mathieux",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "py9l7pey",
+          "label": "demander à valentin de commencer à rédiger sa thèse",
+          "note": "",
+          "done": true,
+          "indent": 0
+        },
+        {
+          "id": "re1bxffz",
+          "label": "mail à jessica pour son HDR",
+          "note": "",
+          "done": true,
+          "indent": 0
+        },
+        {
+          "id": "dz58ux6c",
+          "label": "Report de la réunion et nouveau doodle pour FRI pour fin avril",
+          "note": "",
+          "done": true,
+          "indent": 0
+        },
+        {
+          "id": "f0jv12yh",
+          "label": "trouver un créneau de rdv avec jessica et stéphanie pour après le 1 er avril",
+          "note": "",
+          "done": true,
+          "indent": 0
+        }
+      ]
+    },
+    {
+      "id": "arfhou6e",
+      "emoji": "📊",
+      "title": "Entrepreneur (directeur scientifique de Nexomedis)",
+      "badge": "",
+      "color": "blue",
+      "description": "",
+      "collapsed": false,
+      "tasks": [
+        {
+          "id": "d3nsxxr1",
+          "label": "répondre à MC pour l'article sidero",
+          "note": "",
+          "done": true,
+          "indent": 0
+        },
+        {
+          "id": "t26",
+          "label": "Design : Créer le logo du logiciel PHA.",
+          "note": "",
+          "done": false,
+          "indent": 0
+        },
+        {
+          "id": "wned9yny",
+          "label": "msg à nathalie",
+          "note": "",
+          "done": true,
+          "indent": 0
+        }
+      ]
+    },
+    {
+      "id": "gdcxw8l9",
+      "emoji": "🎓",
+      "title": "Indépendant (Rédacteur en chef, consultant et prof d'université)",
+      "badge": "",
+      "color": "blue",
+      "description": "",
+      "collapsed": false,
+      "tasks": [
+        {
+          "id": "nd0p3x5o",
+          "label": "faire des recherches pour être indépendant ",
+          "note": "",
+          "done": false,
+          "indent": 0
+        }
+      ]
+    },
+    {
+      "id": "ch1ts65h",
+      "emoji": "🏠",
+      "title": "Personnel",
+      "badge": "",
+      "color": "blue",
+      "description": "",
+      "collapsed": false,
+      "tasks": [
+        {
+          "id": "ikdcdlnq",
+          "label": "renomer mes projets sur storga",
+          "note": "",
+          "done": false,
+          "indent": 0
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "githubToken": ""
+  }
+}
