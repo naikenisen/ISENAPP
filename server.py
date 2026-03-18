@@ -44,16 +44,19 @@ LOG_FILE = os.path.join(DIR, "api_errors.log")
 DOWNLOADS = str(Path.home() / "Téléchargements")
 
 # ── Mail storage ──
-MAILS_DIR = "/home/naiken/mails"
+MAILS_DIR = str(Path.home() / "mails")
 SEEN_UIDS_FILE = os.path.join(DIR, "seen_uids.json")
 ACCOUNTS_FILE = os.path.join(DIR, "accounts.json")
 INBOX_INDEX_FILE = os.path.join(DIR, "inbox_index.json")
 
-OBSIDIAN_MD_DIR = "/home/naiken/Documents/obsidian_coffres/isen/mails"
-OBSIDIAN_ATT_DIR = "/home/naiken/Documents/obsidian_coffres/isen/attachements"
-OBSIDIAN_VAULT = "/home/naiken/Documents/obsidian_coffres/isen"
+ISENAPP_DATA = str(Path.home() / "Documents" / "isenapp_mails")
+OBSIDIAN_MD_DIR = os.path.join(ISENAPP_DATA, "mails")
+OBSIDIAN_ATT_DIR = os.path.join(ISENAPP_DATA, "attachements")
+OBSIDIAN_VAULT = ISENAPP_DATA
 
 os.makedirs(MAILS_DIR, exist_ok=True)
+os.makedirs(OBSIDIAN_MD_DIR, exist_ok=True)
+os.makedirs(OBSIDIAN_ATT_DIR, exist_ok=True)
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -1347,6 +1350,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     except Exception as e:
                         errors.append(f"{mail.get('subject', '?')}: {e}")
                 return self._json({"ok": True, "exported": exported, "errors": errors})
+            except Exception as e:
+                return self._json({"error": str(e)}, 500)
+
+        # ── Import contacts CSV ──
+        if self.path == "/api/contacts/import":
+            try:
+                csv_content = data.get("csv", "")
+                if not csv_content:
+                    return self._json({"error": "Aucun contenu CSV"}, 400)
+                with open(CONTACTS_CSV, "w", encoding="utf-8") as f:
+                    f.write(csv_content)
+                new_contacts = load_contacts()
+                return self._json({"ok": True, "count": len(new_contacts)})
             except Exception as e:
                 return self._json({"error": str(e)}, 500)
 

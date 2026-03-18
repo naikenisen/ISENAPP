@@ -1148,6 +1148,16 @@
             <input type="password" id="geminiKeyInput" placeholder="AIza...">
             <small>Nécessaire pour « Reformuler ». Stockée dans data.json.</small>
         </div>
+        <hr style="border-color:var(--card-border);margin:1rem 0">
+        <div class="form-group">
+            <label>📇 Importer un annuaire de contacts (CSV)</label>
+            <small style="display:block;margin-bottom:0.4rem;color:var(--text-muted)">Fichier CSV avec colonnes : Display Name, First Name, Last Name, Primary Email</small>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <input type="file" id="contactsCsvInput" accept=".csv" style="font-size:0.8rem;color:var(--text)">
+                <button onclick="importContactsCsv()" style="white-space:nowrap;padding:0.35rem 0.8rem;background:var(--accent-green);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.78rem">📥 Importer</button>
+            </div>
+            <small id="contactsCount" style="color:var(--text-muted);margin-top:0.3rem;display:block"></small>
+        </div>
         <div class="modal-actions">
             <button onclick="closeSettings()">Annuler</button>
             <button class="btn-primary" onclick="saveSettings()">Enregistrer</button>
@@ -1708,6 +1718,7 @@ function saveSectionModal() {
    ═══════════════════════════════════════════════════════ */
 function openSettings() {
     document.getElementById('geminiKeyInput').value = state.settings.geminiKey || '';
+    document.getElementById('contactsCount').textContent = contacts.length ? `${contacts.length} contacts chargés` : '';
     document.getElementById('settingsModal').classList.add('show');
 }
 
@@ -1720,6 +1731,37 @@ function saveSettings() {
     closeSettings();
     autoSave();
     showToast('Paramètres sauvegardés', 'success');
+}
+
+async function importContactsCsv() {
+    const input = document.getElementById('contactsCsvInput');
+    if (!input.files.length) {
+        showToast('Sélectionne un fichier CSV.', 'error');
+        return;
+    }
+    const file = input.files[0];
+    const csvText = await file.text();
+    showLoading('Import de l\u2019annuaire\u2026');
+    try {
+        const r = await fetch('/api/contacts/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv: csvText })
+        });
+        const result = await r.json();
+        if (result.ok) {
+            showToast(`Annuaire importé : ${result.count} contacts`, 'success', 3000);
+            await loadContacts();
+            document.getElementById('contactsCount').textContent = `${contacts.length} contacts chargés`;
+            input.value = '';
+        } else {
+            showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Erreur : ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
 }
 
 /* ═══════════════════════════════════════════════════════
