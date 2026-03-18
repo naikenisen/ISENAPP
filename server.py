@@ -72,7 +72,7 @@ def ai_call(token, prompt):
     }).encode()
 
     url = ("https://generativelanguage.googleapis.com/v1beta/"
-           f"models/gemini-2.0-flash:generateContent?key={token}")
+           f"models/gemma-3-27b-it:generateContent?key={token}")
 
     req = urllib.request.Request(
         url, data=body,
