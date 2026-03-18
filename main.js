@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const net = require('net');
 const fs = require('fs');
+const os = require('os');
 const windowStateKeeper = require('electron-window-state');
 
 /* GPU tile-memory fix — prevents "tile memory limits exceeded" on large SVG graphs */
@@ -215,7 +216,7 @@ ipcMain.handle('fs:writeFile', async (_event, relativePath, content) => {
 /* ═══════════════════════════════════════════════════════
    IPC Handlers — Vault Graph (local scan, no HTTP API)
    ═══════════════════════════════════════════════════════ */
-const VAULT_PATH = '/home/naiken/Documents/obsidian_coffres/isen';
+const VAULT_PATH = path.join(os.homedir(), 'Documents', 'isenapp_mails');
 const WIKILINK_RE = /\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g;
 const ATTACHMENT_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.svg','.pdf','.docx','.xlsx','.pptx','.odt','.csv','.zip']);
 

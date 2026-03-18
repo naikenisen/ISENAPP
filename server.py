@@ -391,7 +391,7 @@ def fetch_pop3(account):
 
                 mail_id = compute_mail_id(raw_bytes)
 
-                # Save raw .eml to /home/naiken/mails
+                # Save raw .eml to MAILS_DIR
                 safe_id = mail_id[:16]
                 eml_filename = f"{safe_id}.eml"
                 eml_path = os.path.join(MAILS_DIR, eml_filename)
