@@ -3152,6 +3152,7 @@ function closeDeleteMailModal() {
 
 async function confirmDeleteMail() {
     if (!deleteMailTarget) return;
+    const targetId = deleteMailTarget;
     const deleteOnServer = document.getElementById('deleteOnServer').checked;
     closeDeleteMailModal();
     showLoading('Suppression du mail…');
@@ -3159,12 +3160,12 @@ async function confirmDeleteMail() {
         const r = await fetch('/api/mail/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: deleteMailTarget, delete_on_server: deleteOnServer })
+            body: JSON.stringify({ id: targetId, delete_on_server: deleteOnServer })
         });
         const result = await r.json();
         if (result.ok) {
-            inboxMails = inboxMails.filter(m => m.id !== deleteMailTarget);
-            if (selectedInboxId === deleteMailTarget) {
+            inboxMails = inboxMails.filter(m => m.id !== targetId);
+            if (selectedInboxId === targetId) {
                 selectedInboxId = null;
                 document.getElementById('inboxReader').innerHTML = `
                     <div class="inbox-reader-empty">
