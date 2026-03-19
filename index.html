@@ -3288,11 +3288,11 @@ function renderAccountsList() {
             <div class="form-row">
                 <div class="form-group">
                     <label>Google OAuth Client ID</label>
-                    <input type="text" value="${esc(acc.oauth_client_id || '')}" onchange="accountsData[${i}].oauth_client_id=this.value" placeholder="1234567890-xxxx.apps.googleusercontent.com">
+                    <input type="text" value="${esc(acc.oauth_client_id || '')}" onchange="accountsData[${i}].oauth_client_id=this.value" placeholder="Votre Client ID OAuth Google">
                 </div>
                 <div class="form-group">
                     <label>Google OAuth Client Secret</label>
-                    <input type="password" value="${esc(acc.oauth_client_secret || '')}" onchange="accountsData[${i}].oauth_client_secret=this.value" placeholder="GOCSPX-...">
+                    <input type="password" value="${esc(acc.oauth_client_secret || '')}" onchange="accountsData[${i}].oauth_client_secret=this.value" placeholder="Votre Client Secret OAuth Google">
                 </div>
             </div>
             <div class="form-row">
