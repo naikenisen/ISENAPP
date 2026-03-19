@@ -14,6 +14,7 @@ import mailbox
 import os
 import poplib
 import re
+import secrets
 import shutil
 import smtplib
 import socket
@@ -21,6 +22,7 @@ import ssl
 import subprocess
 import time
 import urllib.request
+import urllib.parse
 from urllib.parse import parse_qs, urlparse
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -45,11 +47,22 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 def get_app_data_dir():
     """Return a writable data directory for runtime files.
 
-    In dev mode we keep writing next to server.py. In packaged mode (AppImage/.deb),
-    resources are typically read-only so we switch to ~/.local/share/isenapp.
+    Runtime data is always stored outside the source tree so secrets/config are
+    per-installation and never written to the git repository.
+
+    Priority:
+    1) ISENAPP_DATA_DIR env var (explicit override)
+    2) XDG_DATA_HOME/isenapp
+    3) ~/.local/share/isenapp
     """
-    if os.access(DIR, os.W_OK):
-        return DIR
+    env_override = os.environ.get("ISENAPP_DATA_DIR", "").strip()
+    if env_override:
+        return env_override
+
+    xdg_data_home = os.environ.get("XDG_DATA_HOME", "").strip()
+    if xdg_data_home:
+        return os.path.join(xdg_data_home, "isenapp")
+
     return os.path.join(str(Path.home()), ".local", "share", "isenapp")
 
 
@@ -115,6 +128,9 @@ OBSIDIAN_VAULT = ISENAPP_DATA
 os.makedirs(MAILS_DIR, exist_ok=True)
 os.makedirs(OBSIDIAN_MD_DIR, exist_ok=True)
 os.makedirs(OBSIDIAN_ATT_DIR, exist_ok=True)
+
+# In-memory OAuth state store (state -> metadata) for current server process.
+GOOGLE_OAUTH_PENDING = {}
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -243,11 +259,165 @@ def save_eml_to_downloads(from_addr, to_addr, subject, body_text):
 #  Accounts Management
 # ═══════════════════════════════════════════════════════
 def load_accounts():
-    return read_json_with_backup(ACCOUNTS_FILE, [])
+    accounts = read_json_with_backup(ACCOUNTS_FILE, [])
+    if not isinstance(accounts, list):
+        return []
+    for acc in accounts:
+        normalize_auth_fields(acc)
+    return accounts
 
 
 def save_accounts(accounts):
     atomic_write_json(ACCOUNTS_FILE, accounts)
+
+
+def normalize_auth_fields(account):
+    """Normalize auth/provider fields for backward compatibility."""
+    provider = (account.get("provider", "") or "").lower()
+    auth_type = (account.get("auth_type", "") or "").lower()
+    if provider == "gmail_oauth" and not auth_type:
+        auth_type = "oauth2"
+    if auth_type:
+        account["auth_type"] = auth_type
+    return account
+
+
+def find_account_index_by_email(accounts, email_addr):
+    target = (email_addr or "").strip().lower()
+    for idx, acc in enumerate(accounts):
+        if (acc.get("email", "") or "").strip().lower() == target:
+            return idx
+    return -1
+
+
+def build_oauth_callback_page(ok, message):
+    color = "#34d399" if ok else "#ef4444"
+    icon = "✅" if ok else "❌"
+    title = "Connexion Gmail réussie" if ok else "Connexion Gmail échouée"
+    return f"""<!doctype html>
+<html lang=\"fr\"><head><meta charset=\"utf-8\"><title>{title}</title>
+<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>
+<body style=\"font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:1rem\">
+  <div style=\"max-width:560px;width:100%;background:#111827;border:1px solid #374151;border-radius:12px;padding:1rem 1.2rem;box-shadow:0 8px 30px rgba(0,0,0,.35)\">
+    <h1 style=\"margin:.1rem 0 .6rem 0;font-size:1.2rem;color:{color}\">{icon} {title}</h1>
+    <p style=\"line-height:1.5;margin:0 0 .7rem 0\">{message}</p>
+    <p style=\"line-height:1.5;margin:0;color:#94a3b8\">Tu peux maintenant fermer cet onglet et revenir dans ISENAPP.</p>
+  </div>
+</body></html>"""
+
+
+def _b64url(data_bytes):
+    return base64.urlsafe_b64encode(data_bytes).decode().rstrip("=")
+
+
+def generate_pkce_pair():
+    verifier = _b64url(secrets.token_bytes(64))
+    challenge = _b64url(hashlib.sha256(verifier.encode("utf-8")).digest())
+    return verifier, challenge
+
+
+def exchange_google_auth_code(client_id, client_secret, redirect_uri, code, code_verifier):
+    payload = {
+        "grant_type": "authorization_code",
+        "client_id": client_id,
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "code_verifier": code_verifier,
+    }
+    if client_secret:
+        payload["client_secret"] = client_secret
+
+    body = urllib.parse.urlencode(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.loads(resp.read())
+
+
+def refresh_google_token(account):
+    refresh_token = (account.get("oauth_refresh_token", "") or "").strip()
+    client_id = (account.get("oauth_client_id", "") or "").strip()
+    client_secret = (account.get("oauth_client_secret", "") or "").strip()
+    if not refresh_token:
+        raise RuntimeError("Refresh token Gmail manquant. Reconnecte le compte OAuth.")
+    if not client_id:
+        raise RuntimeError("Client ID OAuth manquant pour ce compte Gmail.")
+
+    payload = {
+        "grant_type": "refresh_token",
+        "client_id": client_id,
+        "refresh_token": refresh_token,
+    }
+    if client_secret:
+        payload["client_secret"] = client_secret
+
+    body = urllib.parse.urlencode(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        token_data = json.loads(resp.read())
+
+    access_token = token_data.get("access_token", "")
+    expires_in = int(token_data.get("expires_in", 3600))
+    if not access_token:
+        raise RuntimeError("Google OAuth: access_token absent après refresh.")
+
+    account["oauth_access_token"] = access_token
+    account["oauth_token_expiry"] = int(time.time()) + max(30, expires_in - 30)
+    if token_data.get("refresh_token"):
+        account["oauth_refresh_token"] = token_data["refresh_token"]
+
+    return account
+
+
+def get_valid_gmail_access_token(account_email):
+    """Load account from storage, refresh token when needed, and return valid token."""
+    accounts = load_accounts()
+    idx = find_account_index_by_email(accounts, account_email)
+    if idx < 0:
+        raise RuntimeError(f"Compte introuvable: {account_email}")
+
+    account = normalize_auth_fields(accounts[idx])
+    if account.get("auth_type") != "oauth2":
+        raise RuntimeError("Ce compte n'est pas configuré en OAuth 2.0.")
+
+    now = int(time.time())
+    access_token = (account.get("oauth_access_token", "") or "").strip()
+    expiry = int(account.get("oauth_token_expiry", 0) or 0)
+
+    if access_token and expiry > now + 60:
+        return access_token
+
+    try:
+        account = refresh_google_token(account)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Google OAuth refresh HTTP {e.code}: {body}")
+    except Exception as e:
+        raise RuntimeError(f"Refresh token Gmail impossible: {e}")
+
+    accounts[idx] = account
+    save_accounts(accounts)
+    return account.get("oauth_access_token", "")
+
+
+def build_xoauth2_string(username, access_token):
+    raw = f"user={username}\x01auth=Bearer {access_token}\x01\x01"
+    return raw.encode("utf-8")
+
+
+def smtp_auth_xoauth2(server, username, access_token):
+    token = base64.b64encode(build_xoauth2_string(username, access_token)).decode("ascii")
+    code, resp = server.docmd("AUTH", f"XOAUTH2 {token}")
+    if code != 235:
+        detail = resp.decode("utf-8", errors="replace") if isinstance(resp, bytes) else str(resp)
+        raise RuntimeError(f"SMTP OAuth refusé ({code}): {detail}")
 
 
 # ═══════════════════════════════════════════════════════
@@ -551,12 +721,14 @@ def fetch_pop3(account):
 # ═══════════════════════════════════════════════════════
 def fetch_imap(account):
     """Fetch emails via IMAP for one account. Returns (new_count, errors)."""
+    account = normalize_auth_fields(account)
     server = account.get("imap_server", "")
     port = int(account.get("imap_port", 993))
     use_ssl = account.get("imap_ssl", True)
     username = account.get("username", "")
     password = account.get("password", "")
     account_email = account.get("email", username)
+    auth_type = account.get("auth_type", "password")
     post_action = account.get("imap_post_action", "mark_read")  # mark_read | delete
 
     seen = load_seen_uids()
@@ -574,7 +746,12 @@ def fetch_imap(account):
         else:
             imap = imaplib.IMAP4(server, port)
 
-        imap.login(username, password)
+        if auth_type == "oauth2":
+            oauth_user = username or account_email
+            access_token = get_valid_gmail_access_token(account_email)
+            imap.authenticate("XOAUTH2", lambda _: build_xoauth2_string(oauth_user, access_token))
+        else:
+            imap.login(username, password)
         imap.select("INBOX")
 
         # Search for all messages
@@ -806,6 +983,7 @@ def send_email_smtp(account, to_addr, subject, body_text, cc="", attachments=Non
     """Send email via SMTP using account config. Also saves .eml locally.
     attachments: list of dicts with keys: filename, content_type, data (base64-encoded)
     """
+    account = normalize_auth_fields(account)
     smtp_server = account.get("smtp_server", "")
     smtp_port = int(account.get("smtp_port", 587))
     smtp_ssl = account.get("smtp_ssl", False)
@@ -813,6 +991,7 @@ def send_email_smtp(account, to_addr, subject, body_text, cc="", attachments=Non
     username = account.get("username", "")
     password = account.get("password", "")
     from_addr = account.get("email", username)
+    auth_type = account.get("auth_type", "password")
 
     msg = MIMEMultipart()
     msg["From"] = from_addr
@@ -844,10 +1023,17 @@ def send_email_smtp(account, to_addr, subject, body_text, cc="", attachments=Non
         server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30)
     else:
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+        server.ehlo()
         if smtp_starttls:
             server.starttls()
+            server.ehlo()
 
-    server.login(username, password)
+    if auth_type == "oauth2":
+        oauth_user = username or from_addr
+        access_token = get_valid_gmail_access_token(from_addr)
+        smtp_auth_xoauth2(server, oauth_user, access_token)
+    else:
+        server.login(username, password)
 
     all_recipients = [a.strip() for a in to_addr.split(",")]
     if cc:
@@ -892,6 +1078,7 @@ def find_account_by_email(email_addr):
 # ═══════════════════════════════════════════════════════
 def delete_mail_on_server(account, uid_to_delete):
     """Connect via POP3 or IMAP and delete a message by UID."""
+    account = normalize_auth_fields(account)
     protocol = account.get("protocol", "pop3").lower()
 
     if protocol == "imap":
@@ -900,13 +1087,20 @@ def delete_mail_on_server(account, uid_to_delete):
         use_ssl = account.get("imap_ssl", True)
         username = account.get("username", "")
         password = account.get("password", "")
+        account_email = account.get("email", username)
+        auth_type = account.get("auth_type", "password")
 
         if use_ssl:
             imap = imaplib.IMAP4_SSL(server, port)
         else:
             imap = imaplib.IMAP4(server, port)
 
-        imap.login(username, password)
+        if auth_type == "oauth2":
+            oauth_user = username or account_email
+            access_token = get_valid_gmail_access_token(account_email)
+            imap.authenticate("XOAUTH2", lambda _: build_xoauth2_string(oauth_user, access_token))
+        else:
+            imap.login(username, password)
         imap.select("INBOX")
 
         status, data = imap.search(None, f"UID {uid_to_delete}")
@@ -1240,6 +1434,103 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
+        if self.path.startswith("/api/oauth/google/callback"):
+            try:
+                qs = parse_qs(urlparse(self.path).query)
+                err = (qs.get("error", [""])[0] or "").strip()
+                state = (qs.get("state", [""])[0] or "").strip()
+                code = (qs.get("code", [""])[0] or "").strip()
+
+                if err:
+                    html = build_oauth_callback_page(False, f"Google a renvoyé une erreur: {err}")
+                    self.send_response(400)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+
+                pending = GOOGLE_OAUTH_PENDING.pop(state, None)
+                if not pending:
+                    html = build_oauth_callback_page(False, "État OAuth invalide ou expiré.")
+                    self.send_response(400)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+
+                if not code:
+                    html = build_oauth_callback_page(False, "Code OAuth absent.")
+                    self.send_response(400)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+
+                account_email = pending["account_email"]
+                accounts = load_accounts()
+                idx = find_account_index_by_email(accounts, account_email)
+                if idx < 0:
+                    html = build_oauth_callback_page(False, "Compte cible introuvable. Réessaie depuis l'application.")
+                    self.send_response(404)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+
+                account = normalize_auth_fields(accounts[idx])
+                client_id = (account.get("oauth_client_id", "") or "").strip()
+                client_secret = (account.get("oauth_client_secret", "") or "").strip()
+                redirect_uri = (account.get("oauth_redirect_uri", "") or "").strip() or "http://127.0.0.1:8080/api/oauth/google/callback"
+
+                token_data = exchange_google_auth_code(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    redirect_uri=redirect_uri,
+                    code=code,
+                    code_verifier=pending["code_verifier"],
+                )
+
+                access_token = token_data.get("access_token", "")
+                refresh_token = token_data.get("refresh_token", "")
+                expires_in = int(token_data.get("expires_in", 3600))
+                if not access_token:
+                    raise RuntimeError("Google OAuth: access_token absent")
+
+                account["provider"] = "gmail_oauth"
+                account["auth_type"] = "oauth2"
+                account["protocol"] = "imap"
+                account["email"] = account_email
+                account["username"] = account_email
+                account["imap_server"] = "imap.gmail.com"
+                account["imap_port"] = 993
+                account["imap_ssl"] = True
+                account["imap_post_action"] = account.get("imap_post_action", "mark_read")
+                account["smtp_server"] = "smtp.gmail.com"
+                account["smtp_port"] = 587
+                account["smtp_ssl"] = False
+                account["smtp_starttls"] = True
+                account["oauth_access_token"] = access_token
+                account["oauth_token_expiry"] = int(time.time()) + max(30, expires_in - 30)
+                if refresh_token:
+                    account["oauth_refresh_token"] = refresh_token
+
+                accounts[idx] = account
+                save_accounts(accounts)
+
+                html = build_oauth_callback_page(True, f"Le compte {account_email} est désormais connecté via Google OAuth 2.0.")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(html.encode("utf-8"))
+                return
+            except Exception as e:
+                html = build_oauth_callback_page(False, f"Impossible de finaliser OAuth: {e}")
+                self.send_response(500)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(html.encode("utf-8"))
+                return
+
         if self.path == "/api/state":
             return self._json(load())
         if self.path == "/api/contacts":
@@ -1375,8 +1666,85 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/api/accounts/save":
             try:
                 accounts = data.get("accounts", [])
+                for acc in accounts:
+                    normalize_auth_fields(acc)
+                    if (acc.get("provider", "") or "").lower() == "gmail_oauth":
+                        acc["protocol"] = "imap"
+                        acc["auth_type"] = "oauth2"
+                        acc["username"] = acc.get("email", acc.get("username", ""))
+                        acc["imap_server"] = "imap.gmail.com"
+                        acc["imap_port"] = 993
+                        acc["imap_ssl"] = True
+                        acc["smtp_server"] = "smtp.gmail.com"
+                        acc["smtp_port"] = 587
+                        acc["smtp_ssl"] = False
+                        acc["smtp_starttls"] = True
+                        if not acc.get("oauth_redirect_uri"):
+                            acc["oauth_redirect_uri"] = "http://127.0.0.1:8080/api/oauth/google/callback"
+                        if not acc.get("oauth_scope"):
+                            acc["oauth_scope"] = "https://mail.google.com/"
                 save_accounts(accounts)
                 return self._json({"ok": True})
+            except Exception as e:
+                return self._json({"error": str(e)}, 500)
+
+        # ── Start Google OAuth flow for Gmail account ──
+        if self.path == "/api/oauth/google/start":
+            try:
+                account_email = (data.get("email", "") or "").strip()
+                if not account_email or "@" not in account_email:
+                    return self._json({"error": "Adresse email invalide"}, 400)
+
+                accounts = load_accounts()
+                idx = find_account_index_by_email(accounts, account_email)
+                if idx < 0:
+                    return self._json({"error": "Compte introuvable"}, 404)
+
+                account = normalize_auth_fields(accounts[idx])
+                client_id = (account.get("oauth_client_id", "") or "").strip()
+                client_secret = (account.get("oauth_client_secret", "") or "").strip()
+                redirect_uri = (account.get("oauth_redirect_uri", "") or "").strip() or "http://127.0.0.1:8080/api/oauth/google/callback"
+                scope = (account.get("oauth_scope", "") or "").strip() or "https://mail.google.com/"
+
+                if not client_id:
+                    return self._json({"error": "Client ID OAuth requis pour Gmail."}, 400)
+
+                verifier, challenge = generate_pkce_pair()
+                state = secrets.token_urlsafe(24)
+                GOOGLE_OAUTH_PENDING[state] = {
+                    "account_email": account_email,
+                    "code_verifier": verifier,
+                    "created_at": int(time.time()),
+                }
+
+                query = {
+                    "client_id": client_id,
+                    "redirect_uri": redirect_uri,
+                    "response_type": "code",
+                    "scope": scope,
+                    "access_type": "offline",
+                    "prompt": "consent",
+                    "include_granted_scopes": "true",
+                    "state": state,
+                    "code_challenge": challenge,
+                    "code_challenge_method": "S256",
+                }
+                auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(query)
+
+                # Persist normalized values before opening auth URL.
+                account["provider"] = "gmail_oauth"
+                account["auth_type"] = "oauth2"
+                account["protocol"] = "imap"
+                account["username"] = account_email
+                account["email"] = account_email
+                account["oauth_redirect_uri"] = redirect_uri
+                account["oauth_scope"] = scope
+                if client_secret:
+                    account["oauth_client_secret"] = client_secret
+                accounts[idx] = account
+                save_accounts(accounts)
+
+                return self._json({"ok": True, "auth_url": auth_url})
             except Exception as e:
                 return self._json({"error": str(e)}, 500)
 

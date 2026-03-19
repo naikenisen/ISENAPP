@@ -1046,11 +1046,7 @@
             <div class="mail-field">
                 <label>Expéditeur</label>
                 <select id="mailFrom">
-                    <option value="isen.naiken@nexomedis.com">isen.naiken@nexomedis.com</option>
-                    <option value="isen.naiken@revue-ia-sante.fr">isen.naiken@revue-ia-sante.fr</option>
-                    <option value="redaction@revue-ia-sante.fr">redaction@revue-ia-sante.fr</option>
-                    <option value="Isen_Naiken@etu.ube.fr">Isen_Naiken@etu.ube.fr</option>
-                    <option value="isennaiken3@gmail.com">isennaiken3@gmail.com</option>
+                    <option value="">Chargement des comptes…</option>
                 </select>
             </div>
             <div class="mail-field">
@@ -1232,7 +1228,7 @@
 <!-- Accounts Modal -->
 <div class="modal-overlay" id="accountsModal" onclick="if(event.target===this)closeAccountsModal()">
     <div class="modal" style="max-width:650px">
-        <h2><i class="icon-user"></i> Comptes mail (POP3 / IMAP / SMTP)</h2>
+        <h2><i class="icon-user"></i> Comptes mail (POP3 / IMAP / SMTP / Gmail OAuth 2.0)</h2>
         <div id="accountsList"></div>
         <button class="add-task-btn" onclick="addAccountForm()" style="margin-bottom:1rem">+ Ajouter un compte</button>
         <div class="modal-actions">
@@ -2990,7 +2986,7 @@ async function fetchEmails() {
     const statusEl = document.getElementById('inbox-status');
     statusEl.style.display = 'block';
     statusEl.className = 'inbox-status loading';
-    statusEl.textContent = 'Connexion aux serveurs (POP3/IMAP)…';
+    statusEl.textContent = 'Connexion aux serveurs (POP3/IMAP/Gmail OAuth)…';
 
     try {
         const r = await fetch('/api/fetch-emails', { method: 'POST' });
@@ -3205,10 +3201,46 @@ function updateInboxBadge() {
    ═══════════════════════════════════════════════════════ */
 let accountsData = [];
 
+function normalizeAccountDefaults(acc = {}) {
+    const provider = (acc.provider || 'custom').toLowerCase();
+    const authType = provider === 'gmail_oauth' ? 'oauth2' : (acc.auth_type || 'password');
+    const email = (acc.email || '').trim();
+    return {
+        provider,
+        auth_type: authType,
+        email,
+        protocol: provider === 'gmail_oauth' ? 'imap' : (acc.protocol || 'imap'),
+        pop3_server: acc.pop3_server || '',
+        pop3_port: acc.pop3_port || 995,
+        pop3_ssl: acc.pop3_ssl !== false,
+        imap_server: provider === 'gmail_oauth' ? 'imap.gmail.com' : (acc.imap_server || ''),
+        imap_port: provider === 'gmail_oauth' ? 993 : (acc.imap_port || 993),
+        imap_ssl: provider === 'gmail_oauth' ? true : (acc.imap_ssl !== false),
+        imap_post_action: acc.imap_post_action || 'mark_read',
+        smtp_server: provider === 'gmail_oauth' ? 'smtp.gmail.com' : (acc.smtp_server || ''),
+        smtp_port: provider === 'gmail_oauth' ? 587 : (acc.smtp_port || 587),
+        smtp_starttls: provider === 'gmail_oauth' ? true : (acc.smtp_starttls !== false),
+        smtp_ssl: provider === 'gmail_oauth' ? false : !!acc.smtp_ssl,
+        username: provider === 'gmail_oauth' ? email : (acc.username || ''),
+        password: provider === 'gmail_oauth' ? '' : (acc.password || ''),
+        enabled: acc.enabled !== false,
+        oauth_client_id: acc.oauth_client_id || '',
+        oauth_client_secret: acc.oauth_client_secret || '',
+        oauth_redirect_uri: acc.oauth_redirect_uri || 'http://127.0.0.1:8080/api/oauth/google/callback',
+        oauth_scope: acc.oauth_scope || 'https://mail.google.com/',
+        oauth_refresh_token: acc.oauth_refresh_token || '',
+        oauth_access_token: acc.oauth_access_token || '',
+        oauth_token_expiry: acc.oauth_token_expiry || 0,
+    };
+}
+
 async function openAccountsModal() {
     try {
         const r = await fetch('/api/accounts');
-        if (r.ok) accountsData = await r.json();
+        if (r.ok) {
+            const raw = await r.json();
+            accountsData = raw.map(normalizeAccountDefaults);
+        }
     } catch {}
     renderAccountsList();
     document.getElementById('accountsModal').classList.add('show');
@@ -3224,16 +3256,64 @@ function renderAccountsList() {
         container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem">Aucun compte configuré.</p>';
         return;
     }
-    container.innerHTML = accountsData.map((acc, i) => `
+    container.innerHTML = accountsData.map((rawAcc, i) => {
+        const acc = normalizeAccountDefaults(rawAcc);
+        accountsData[i] = acc;
+        const isGmailOAuth = acc.provider === 'gmail_oauth';
+        const isConnected = !!acc.oauth_refresh_token;
+        return `
         <div class="account-card" data-idx="${i}">
             <button class="account-delete" onclick="removeAccount(${i})" title="Supprimer">✕</button>
+
+            <div class="form-group">
+                <label>Type de compte</label>
+                <select onchange="changeAccountProvider(${i}, this.value)" style="width:100%;background:var(--bg-surface);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:0.35rem 0.5rem;color:var(--text);font-size:0.78rem;cursor:pointer">
+                    <option value="custom" ${!isGmailOAuth ? 'selected' : ''}>Standard (POP3/IMAP/SMTP)</option>
+                    <option value="gmail_oauth" ${isGmailOAuth ? 'selected' : ''}>Gmail (OAuth 2.0)</option>
+                </select>
+            </div>
+
             <div class="form-group">
                 <label>Adresse email</label>
-                <div style="display:flex;gap:0.4rem">
-                    <input type="text" value="${esc(acc.email || '')}" onchange="accountsData[${i}].email=this.value" placeholder="user@example.com" style="flex:1" id="accEmail_${i}">
-                    <button onclick="autoconfigAccount(${i})" style="white-space:nowrap;padding:0.3rem 0.6rem;background:var(--accent-purple);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.72rem" title="Auto-détecter les paramètres">⚡ Autoconfig</button>
+                <div style="display:flex;gap:0.4rem;align-items:center">
+                    <input type="text" value="${esc(acc.email || '')}" onchange="accountsData[${i}].email=this.value;accountsData[${i}].username=this.value" placeholder="user@example.com" style="flex:1" id="accEmail_${i}">
+                    ${isGmailOAuth ?
+                        `<button onclick="startGoogleOAuthForAccount(${i})" style="white-space:nowrap;padding:0.3rem 0.6rem;background:var(--accent-blue);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.72rem" title="Connecter Google">🔐 Connecter Google</button>` :
+                        `<button onclick="autoconfigAccount(${i})" style="white-space:nowrap;padding:0.3rem 0.6rem;background:var(--accent-purple);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.72rem" title="Auto-détecter les paramètres">⚡ Autoconfig</button>`
+                    }
                 </div>
             </div>
+
+            ${isGmailOAuth ? `
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Google OAuth Client ID</label>
+                    <input type="text" value="${esc(acc.oauth_client_id || '')}" onchange="accountsData[${i}].oauth_client_id=this.value" placeholder="1234567890-xxxx.apps.googleusercontent.com">
+                </div>
+                <div class="form-group">
+                    <label>Google OAuth Client Secret</label>
+                    <input type="password" value="${esc(acc.oauth_client_secret || '')}" onchange="accountsData[${i}].oauth_client_secret=this.value" placeholder="GOCSPX-...">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Redirect URI</label>
+                    <input type="text" value="${esc(acc.oauth_redirect_uri || '')}" onchange="accountsData[${i}].oauth_redirect_uri=this.value" placeholder="http://127.0.0.1:8080/api/oauth/google/callback">
+                </div>
+                <div class="form-group">
+                    <label>Scope</label>
+                    <input type="text" value="${esc(acc.oauth_scope || '')}" onchange="accountsData[${i}].oauth_scope=this.value" placeholder="https://mail.google.com/">
+                </div>
+            </div>
+            <div class="form-group" style="padding:0.45rem 0.6rem;border:1px solid var(--card-border);border-radius:var(--radius-sm);background:var(--progress-bg)">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.6rem;flex-wrap:wrap">
+                    <span style="font-size:0.78rem;color:${isConnected ? 'var(--accent-green)' : 'var(--text-muted)'}">
+                        ${isConnected ? 'Connecté à Google (refresh token enregistré)' : 'Pas encore connecté à Google'}
+                    </span>
+                    ${isConnected ? `<button onclick="disconnectGoogleOAuthForAccount(${i})" style="padding:0.28rem 0.55rem;background:#ef4444;color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.72rem">Déconnecter</button>` : ''}
+                </div>
+                <small style="margin-top:0.4rem">IMAP: imap.gmail.com:993 (SSL) | SMTP: smtp.gmail.com:587 (STARTTLS)</small>
+            </div>` : `
             <div class="form-group">
                 <label>Protocole de réception</label>
                 <select onchange="accountsData[${i}].protocol=this.value;renderAccountsList()" style="width:100%;background:var(--bg-surface);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:0.35rem 0.5rem;color:var(--text);font-size:0.78rem;cursor:pointer">
@@ -3255,7 +3335,7 @@ function renderAccountsList() {
             <div class="form-row">
                 <div class="form-group">
                     <label>Serveur IMAP</label>
-                    <input type="text" value="${esc(acc.imap_server || '')}" onchange="accountsData[${i}].imap_server=this.value" placeholder="imap.gmail.com">
+                    <input type="text" value="${esc(acc.imap_server || '')}" onchange="accountsData[${i}].imap_server=this.value" placeholder="imap.example.com">
                 </div>
                 <div class="form-group">
                     <label>Port IMAP</label>
@@ -3288,23 +3368,25 @@ function renderAccountsList() {
                     <label>Mot de passe</label>
                     <input type="password" value="${esc(acc.password || '')}" onchange="accountsData[${i}].password=this.value">
                 </div>
-            </div>
+            </div>`}
+
             <div class="form-row">
-                ${(acc.protocol||'pop3') === 'pop3' ? `
+                ${!isGmailOAuth && (acc.protocol||'pop3') === 'pop3' ? `
                 <label class="account-toggle">
                     <input type="checkbox" ${acc.pop3_ssl !== false ? 'checked' : ''} onchange="accountsData[${i}].pop3_ssl=this.checked">
                     POP3 SSL
-                </label>` : `
+                </label>` : ''}
+                ${!isGmailOAuth && (acc.protocol||'imap') === 'imap' ? `
                 <label class="account-toggle">
                     <input type="checkbox" ${acc.imap_ssl !== false ? 'checked' : ''} onchange="accountsData[${i}].imap_ssl=this.checked">
                     IMAP SSL
-                </label>`}
+                </label>` : ''}
                 <label class="account-toggle">
-                    <input type="checkbox" ${acc.smtp_starttls !== false ? 'checked' : ''} onchange="accountsData[${i}].smtp_starttls=this.checked">
+                    <input type="checkbox" ${acc.smtp_starttls !== false ? 'checked' : ''} onchange="accountsData[${i}].smtp_starttls=this.checked" ${isGmailOAuth ? 'disabled' : ''}>
                     SMTP STARTTLS
                 </label>
                 <label class="account-toggle">
-                    <input type="checkbox" ${acc.smtp_ssl ? 'checked' : ''} onchange="accountsData[${i}].smtp_ssl=this.checked">
+                    <input type="checkbox" ${acc.smtp_ssl ? 'checked' : ''} onchange="accountsData[${i}].smtp_ssl=this.checked" ${isGmailOAuth ? 'disabled' : ''}>
                     SMTP SSL
                 </label>
                 <label class="account-toggle">
@@ -3313,17 +3395,22 @@ function renderAccountsList() {
                 </label>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
+}
+
+function changeAccountProvider(idx, provider) {
+    const base = normalizeAccountDefaults(accountsData[idx]);
+    if (provider === 'gmail_oauth') {
+        accountsData[idx] = normalizeAccountDefaults({ ...base, provider: 'gmail_oauth', auth_type: 'oauth2', protocol: 'imap' });
+    } else {
+        accountsData[idx] = normalizeAccountDefaults({ ...base, provider: 'custom', auth_type: 'password' });
+    }
+    renderAccountsList();
 }
 
 function addAccountForm() {
-    accountsData.push({
-        email: '', protocol: 'imap',
-        pop3_server: '', pop3_port: 995, pop3_ssl: true,
-        imap_server: '', imap_port: 993, imap_ssl: true, imap_post_action: 'mark_read',
-        smtp_server: '', smtp_port: 587, smtp_starttls: true, smtp_ssl: false,
-        username: '', password: '', enabled: true
-    });
+    accountsData.push(normalizeAccountDefaults({ provider: 'custom', protocol: 'imap' }));
     renderAccountsList();
 }
 
@@ -3332,18 +3419,91 @@ function removeAccount(idx) {
     renderAccountsList();
 }
 
-async function saveAccountsFromModal() {
+async function startGoogleOAuthForAccount(idx) {
+    const acc = normalizeAccountDefaults(accountsData[idx]);
+    accountsData[idx] = acc;
+    if (!acc.email || !acc.email.includes('@')) {
+        showToast('Saisis une adresse Gmail valide avant de connecter Google.', 'error', 4000);
+        return;
+    }
+    if (!acc.oauth_client_id) {
+        showToast('Renseigne le Client ID OAuth Google.', 'error', 4000);
+        return;
+    }
+
+    showLoading('Préparation de la connexion Google OAuth…');
     try {
-        const r = await fetch('/api/accounts/save', {
+        await fetch('/api/accounts/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ accounts: accountsData })
         });
+
+        const r = await fetch('/api/oauth/google/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: acc.email })
+        });
+        const result = await r.json();
+        if (!result.ok || !result.auth_url) {
+            showToast('Erreur OAuth: ' + (result.error || 'URL manquante'), 'error', 5000);
+            return;
+        }
+
+        const opened = window.electronAPI && window.electronAPI.openExternal
+            ? await window.electronAPI.openExternal(result.auth_url)
+            : false;
+        if (!opened) window.open(result.auth_url, '_blank', 'noopener');
+
+        showToast('Connexion Google ouverte dans ton navigateur.', 'success', 3500);
+    } catch (e) {
+        showToast('Erreur OAuth: ' + e.message, 'error', 5000);
+    } finally {
+        hideLoading();
+    }
+}
+
+function disconnectGoogleOAuthForAccount(idx) {
+    const acc = normalizeAccountDefaults(accountsData[idx]);
+    acc.oauth_access_token = '';
+    acc.oauth_refresh_token = '';
+    acc.oauth_token_expiry = 0;
+    accountsData[idx] = acc;
+    renderAccountsList();
+}
+
+async function saveAccountsFromModal() {
+    try {
+        const sanitized = accountsData.map((accRaw) => {
+            const acc = normalizeAccountDefaults(accRaw);
+            if (acc.provider === 'gmail_oauth') {
+                acc.auth_type = 'oauth2';
+                acc.protocol = 'imap';
+                acc.username = acc.email;
+                acc.password = '';
+                acc.imap_server = 'imap.gmail.com';
+                acc.imap_port = 993;
+                acc.imap_ssl = true;
+                acc.smtp_server = 'smtp.gmail.com';
+                acc.smtp_port = 587;
+                acc.smtp_ssl = false;
+                acc.smtp_starttls = true;
+                if (!acc.oauth_redirect_uri) acc.oauth_redirect_uri = 'http://127.0.0.1:8080/api/oauth/google/callback';
+                if (!acc.oauth_scope) acc.oauth_scope = 'https://mail.google.com/';
+            }
+            return acc;
+        });
+
+        const r = await fetch('/api/accounts/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accounts: sanitized })
+        });
         const result = await r.json();
         if (result.ok) {
+            accountsData = sanitized;
             closeAccountsModal();
             showToast('Comptes enregistrés', 'success');
-            // Update the mail composer's From dropdown
             updateMailFromOptions();
         } else {
             showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
@@ -3356,19 +3516,27 @@ async function saveAccountsFromModal() {
 function updateMailFromOptions() {
     const select = document.getElementById('mailFrom');
     if (!select) return;
-    // Keep existing options and add any new accounts
-    const existing = new Set();
-    for (let i = 0; i < select.options.length; i++) {
-        existing.add(select.options[i].value);
+    const previous = select.value;
+    const enabled = accountsData.filter(acc => acc.email && acc.enabled !== false);
+    select.innerHTML = '';
+
+    if (!enabled.length) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Aucun compte expéditeur';
+        select.appendChild(placeholder);
+        return;
     }
-    accountsData.forEach(acc => {
-        if (acc.email && !existing.has(acc.email)) {
-            const opt = document.createElement('option');
-            opt.value = acc.email;
-            opt.textContent = acc.email;
-            select.appendChild(opt);
-        }
+
+    enabled.forEach(acc => {
+        const opt = document.createElement('option');
+        opt.value = acc.email;
+        opt.textContent = acc.provider === 'gmail_oauth' ? `${acc.email} (Gmail OAuth)` : acc.email;
+        select.appendChild(opt);
     });
+
+    const hasPrev = enabled.some(acc => acc.email === previous);
+    select.value = hasPrev ? previous : enabled[0].email;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -3380,6 +3548,7 @@ async function sendMailSMTP() {
     const cc = getMailCcValue();
     const subject = document.getElementById('mailSubject').value.trim();
     const body = document.getElementById('mailBody').value.trim();
+    if (!from) { showToast('Configure d\'abord un compte expéditeur.', 'error'); return; }
     if (!to || !subject) { showToast('Remplis le(s) destinataire(s) et le sujet.', 'error'); return; }
 
     // Save to task if associated
@@ -3569,7 +3738,7 @@ setInterval(() => {
         updateInboxBadge();
         // Populate From dropdown with account emails
         fetch('/api/accounts').then(r => r.json()).then(accs => {
-            accountsData = accs;
+            accountsData = (Array.isArray(accs) ? accs : []).map(normalizeAccountDefaults);
             updateMailFromOptions();
         }).catch(() => {});
     });

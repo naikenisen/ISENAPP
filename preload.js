@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFileDialog: (options) => ipcRenderer.invoke('dialog:openFile', options),
   saveFileDialog: (options) => ipcRenderer.invoke('dialog:saveFile', options),
   messageDialog: (options) => ipcRenderer.invoke('dialog:message', options),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 
   // ── File System (scoped) ────────────────────
   readFile: (relativePath) => ipcRenderer.invoke('fs:readFile', relativePath),

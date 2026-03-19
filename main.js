@@ -207,6 +207,16 @@ ipcMain.handle('dialog:message', async (_event, options) => {
   return result;
 });
 
+ipcMain.handle('shell:openExternal', async (_event, url) => {
+  try {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return false;
+    await shell.openExternal(url);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 /* ═══════════════════════════════════════════════════════
    IPC Handlers — File System (scoped to app directory)
    ═══════════════════════════════════════════════════════ */

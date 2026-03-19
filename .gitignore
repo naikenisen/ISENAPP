@@ -1,4 +1,12 @@
+# Runtime/local data (per-installation)
 data.json
+accounts.json
+inbox_index.json
+seen_uids.json
+*.bak
+*.tmp
 api_errors.log
+
+# Build/deps
 node_modules/
 dist/

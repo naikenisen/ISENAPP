@@ -254,11 +254,12 @@ package.json             → Configuration npm + electron-builder
 
 ## Configuration des comptes email
 
-1. Ouvrir le modal **Comptes** (icône utilisateur dans l'onglet Inbox ou Mail)
-2. Cliquer **+ Ajouter un compte**
-3. Saisir l'adresse email puis cliquer **⚡ Autoconfig** pour remplir automatiquement les serveurs IMAP/SMTP
-4. Compléter le mot de passe (pour Gmail : utiliser un **mot de passe d'application**, pas le mot de passe principal)
-5. Cliquer **Enregistrer**
+1. Ouvrir le modal **Comptes** (icône utilisateur dans l'onglet Inbox ou Mail).
+2. Cliquer **+ Ajouter un compte**.
+3. Choisir le type de compte.
+4. Type **Standard (POP3/IMAP/SMTP)** : saisir l'adresse email puis cliquer **⚡ Autoconfig**.
+5. Type **Gmail (OAuth 2.0)** : renseigner **Google OAuth Client ID** (+ secret si applicable), puis cliquer **🔐 Connecter Google**.
+6. Cliquer **Enregistrer**.
 
 ### Autoconfiguration
 
@@ -270,13 +271,25 @@ Si le domaine n'est pas trouvé, un fallback teste les hostnames courants (`imap
 
 ### Exemple Gmail
 
+OAuth 2.0 est recommandé pour Gmail.
+
 | Paramètre | Valeur |
 |---|---|
-| Protocole | IMAP |
+| Type | Gmail (OAuth 2.0) |
 | Serveur IMAP | `imap.gmail.com` : 993 (SSL) |
 | Serveur SMTP | `smtp.gmail.com` : 587 (STARTTLS) |
-| Identifiant | `votre.adresse@gmail.com` |
-| Mot de passe | Mot de passe d'application Google |
+| Scope | `https://mail.google.com/` |
+| Redirect URI | `http://127.0.0.1:8080/api/oauth/google/callback` |
+| Authentification | Token OAuth (pas de mot de passe SMTP/IMAP) |
+
+#### Configuration Google Cloud pour OAuth 2.0
+
+1. Ouvrir le projet Google Cloud (ex: `ISENAPP`).
+2. Vérifier l'écran de consentement OAuth (application en test ou production selon ton besoin).
+3. Créer un identifiant OAuth 2.0 (type Desktop ou Web).
+4. Ajouter l'URI de redirection autorisée : `http://127.0.0.1:8080/api/oauth/google/callback`
+5. Copier le **Client ID** (et **Client Secret** si fourni) dans le modal Comptes de l'application.
+6. Cliquer **Connecter Google**, autoriser Gmail, puis revenir dans ISENAPP.
 
 ---
 
