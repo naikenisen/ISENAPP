@@ -34,4 +34,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readVaultFile: (relpath) => ipcRenderer.invoke('vault:readFile', relpath),
   getVaultFileUrl: (relpath) => ipcRenderer.invoke('vault:getFileUrl', relpath),
   openVaultExternal: (relpath) => ipcRenderer.invoke('vault:openExternal', relpath),
+
+  // ── BrowserView Tabs ────────────────────────
+  browserCreateTab: (payload) => ipcRenderer.invoke('browser:createTab', payload),
+  browserActivateTab: (tabId) => ipcRenderer.invoke('browser:activateTab', tabId),
+  browserCloseTab: (tabId) => ipcRenderer.invoke('browser:closeTab', tabId),
+  browserNavigate: (payload) => ipcRenderer.invoke('browser:navigate', payload),
+  browserGoBack: (tabId) => ipcRenderer.invoke('browser:goBack', tabId),
+  browserGoForward: (tabId) => ipcRenderer.invoke('browser:goForward', tabId),
+  browserReload: (tabId) => ipcRenderer.invoke('browser:reload', tabId),
+  browserSetVisible: (visible) => ipcRenderer.invoke('browser:setVisible', visible),
+  browserSetBounds: (bounds) => ipcRenderer.invoke('browser:setBounds', bounds),
+  browserAutofillGithub: (payload) => ipcRenderer.invoke('browser:autofillGithub', payload),
+  browserAutofillSavedCredential: (payload) => ipcRenderer.invoke('browser:autofillSavedCredential', payload),
+  onBrowserTabUpdated: (callback) => {
+    ipcRenderer.on('browser:tab-updated', (_event, payload) => callback(payload));
+  },
+
+  // ── Secure Password Vault ───────────────────
+  passwordVaultStatus: () => ipcRenderer.invoke('passwordVault:status'),
+  passwordVaultList: () => ipcRenderer.invoke('passwordVault:list'),
+  passwordVaultUpsert: (payload) => ipcRenderer.invoke('passwordVault:upsert', payload),
+  passwordVaultDelete: (credentialId) => ipcRenderer.invoke('passwordVault:delete', credentialId),
+  passwordVaultFindByOrigin: (origin) => ipcRenderer.invoke('passwordVault:findByOrigin', origin),
 });

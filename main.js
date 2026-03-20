@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, globalShortcut, shell, protocol } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, dialog, Menu, globalShortcut, shell, protocol, safeStorage } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const net = require('net');
@@ -18,6 +18,135 @@ protocol.registerSchemesAsPrivileged([
 const PORT = 8080;
 let serverProcess = null;
 let mainWindow = null;
+let browserVisible = false;
+let activeBrowserTabId = null;
+let browserBounds = { x: 0, y: 0, width: 0, height: 0 };
+const browserViews = new Map();
+
+/* Secure password vault (encrypted at rest via OS keyring through Electron safeStorage). */
+function getPasswordVaultFilePath() {
+  return path.join(app.getPath('userData'), 'password_vault.json');
+}
+
+function passwordEncryptionAvailable() {
+  try {
+    return !!(safeStorage && safeStorage.isEncryptionAvailable());
+  } catch {
+    return false;
+  }
+}
+
+function normalizeCredentialOrigin(rawOrigin) {
+  const raw = String(rawOrigin || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return (url.hostname || '').toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function readPasswordVault() {
+  const fp = getPasswordVaultFilePath();
+  try {
+    const raw = fs.readFileSync(fp, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.entries)) {
+      return { version: 1, entries: parsed.entries };
+    }
+  } catch {}
+  return { version: 1, entries: [] };
+}
+
+function writePasswordVault(vault) {
+  const fp = getPasswordVaultFilePath();
+  fs.mkdirSync(path.dirname(fp), { recursive: true });
+  fs.writeFileSync(fp, JSON.stringify(vault, null, 2), { encoding: 'utf-8', mode: 0o600 });
+}
+
+function encryptVaultSecret(value) {
+  if (!passwordEncryptionAvailable()) {
+    throw new Error('Chiffrement indisponible: keyring systeme non detecte.');
+  }
+  return safeStorage.encryptString(String(value || '')).toString('base64');
+}
+
+function decryptVaultSecret(cipherB64) {
+  try {
+    const plain = safeStorage.decryptString(Buffer.from(String(cipherB64 || ''), 'base64'));
+    return String(plain || '');
+  } catch {
+    return '';
+  }
+}
+
+function listVaultEntriesDecrypted() {
+  const vault = readPasswordVault();
+  return vault.entries.map((entry) => ({
+    id: entry.id,
+    origin: entry.origin,
+    label: entry.label || '',
+    username: decryptVaultSecret(entry.usernameEnc),
+    updatedAt: entry.updatedAt || '',
+  }));
+}
+
+function getVaultEntryById(credentialId) {
+  const id = String(credentialId || '').trim();
+  if (!id) return null;
+  const vault = readPasswordVault();
+  return vault.entries.find((entry) => entry.id === id) || null;
+}
+
+function autofillLoginFormScript(username, password) {
+  return `(() => {
+    const username = ${JSON.stringify(String(username || ''))};
+    const password = ${JSON.stringify(String(password || ''))};
+
+    const isVisible = (el) => {
+      if (!el) return false;
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
+    };
+    const setValue = (el, value) => {
+      if (!el) return false;
+      el.focus();
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    };
+
+    const userSelectors = [
+      'input[name="username"]',
+      'input[name="login"]',
+      'input[name="email"]',
+      'input[type="email"]',
+      'input[autocomplete="username"]',
+      'input[id*="user" i]',
+      'input[id*="login" i]'
+    ];
+    const passSelectors = [
+      'input[type="password"]',
+      'input[name="password"]',
+      'input[autocomplete="current-password"]',
+      'input[autocomplete="new-password"]'
+    ];
+
+    const userInput = userSelectors
+      .flatMap((s) => Array.from(document.querySelectorAll(s)))
+      .find((el) => isVisible(el) && !el.disabled && !el.readOnly);
+    const passInput = passSelectors
+      .flatMap((s) => Array.from(document.querySelectorAll(s)))
+      .find((el) => isVisible(el) && !el.disabled && !el.readOnly);
+
+    const userOk = setValue(userInput, username);
+    const passOk = setValue(passInput, password);
+    return { ok: userOk && passOk, userOk, passOk };
+  })();`;
+}
 
 /* ═══════════════════════════════════════════════════════
    Path Helpers (handles packaged vs dev mode)
@@ -113,6 +242,9 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -127,9 +259,370 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => {
+    for (const view of browserViews.values()) {
+      try {
+        if (!view.webContents.isDestroyed()) view.webContents.destroy();
+      } catch {}
+    }
+    browserViews.clear();
+    activeBrowserTabId = null;
     mainWindow = null;
   });
+
+  mainWindow.on('resize', () => {
+    applyBrowserViewLayout();
+  });
 }
+
+/* ═══════════════════════════════════════════════════════
+   BrowserView Tabs (native Electron browser areas)
+   ═══════════════════════════════════════════════════════ */
+function sanitizeBrowserUrl(rawUrl) {
+  const url = String(rawUrl || '').trim();
+  if (!url) return 'https://www.google.com';
+  if (/^https?:\/\//i.test(url)) return url;
+  return 'https://' + url;
+}
+
+function emitBrowserTabUpdate(tabId, payload = {}) {
+  if (!mainWindow || !mainWindow.webContents || mainWindow.webContents.isDestroyed()) return;
+  mainWindow.webContents.send('browser:tab-updated', { tabId, ...payload });
+}
+
+function detachAllBrowserViews() {
+  if (!mainWindow) return;
+  for (const view of browserViews.values()) {
+    try { mainWindow.removeBrowserView(view); } catch {}
+  }
+}
+
+function applyBrowserViewLayout() {
+  if (!mainWindow || !browserVisible || !activeBrowserTabId) return;
+  const active = browserViews.get(activeBrowserTabId);
+  if (!active) return;
+
+  const bounds = {
+    x: Math.max(0, Math.floor(browserBounds.x || 0)),
+    y: Math.max(0, Math.floor(browserBounds.y || 0)),
+    width: Math.max(100, Math.floor(browserBounds.width || 0)),
+    height: Math.max(100, Math.floor(browserBounds.height || 0)),
+  };
+
+  try {
+    active.setBounds(bounds);
+    active.setAutoResize({ width: false, height: false, horizontal: false, vertical: false });
+  } catch {}
+}
+
+function ensureBrowserViewTab(tabId, initialUrl) {
+  if (browserViews.has(tabId)) return browserViews.get(tabId);
+
+  const view = new BrowserView({
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
+    },
+  });
+  browserViews.set(tabId, view);
+
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    try { view.webContents.loadURL(sanitizeBrowserUrl(url)); } catch {}
+    return { action: 'deny' };
+  });
+
+  view.webContents.on('did-start-loading', () => {
+    emitBrowserTabUpdate(tabId, { loading: true });
+  });
+  view.webContents.on('did-stop-loading', () => {
+    emitBrowserTabUpdate(tabId, {
+      loading: false,
+      url: view.webContents.getURL(),
+      title: view.webContents.getTitle(),
+      canGoBack: view.webContents.canGoBack(),
+      canGoForward: view.webContents.canGoForward(),
+    });
+  });
+  view.webContents.on('did-navigate', (_event, url) => {
+    emitBrowserTabUpdate(tabId, {
+      url,
+      title: view.webContents.getTitle(),
+      canGoBack: view.webContents.canGoBack(),
+      canGoForward: view.webContents.canGoForward(),
+    });
+  });
+  view.webContents.on('did-navigate-in-page', (_event, url) => {
+    emitBrowserTabUpdate(tabId, {
+      url,
+      title: view.webContents.getTitle(),
+      canGoBack: view.webContents.canGoBack(),
+      canGoForward: view.webContents.canGoForward(),
+    });
+  });
+  view.webContents.on('page-title-updated', () => {
+    emitBrowserTabUpdate(tabId, { title: view.webContents.getTitle() });
+  });
+
+  view.webContents.loadURL(sanitizeBrowserUrl(initialUrl || 'https://www.google.com')).catch(() => {});
+  return view;
+}
+
+function activateBrowserViewTab(tabId) {
+  if (!mainWindow) return false;
+  const view = browserViews.get(tabId);
+  if (!view) return false;
+
+  activeBrowserTabId = tabId;
+  detachAllBrowserViews();
+  if (browserVisible) {
+    try { mainWindow.addBrowserView(view); } catch {}
+    applyBrowserViewLayout();
+  }
+
+  emitBrowserTabUpdate(tabId, {
+    url: view.webContents.getURL(),
+    title: view.webContents.getTitle(),
+    loading: view.webContents.isLoading(),
+    canGoBack: view.webContents.canGoBack(),
+    canGoForward: view.webContents.canGoForward(),
+    active: true,
+  });
+  return true;
+}
+
+ipcMain.handle('browser:createTab', async (_event, payload = {}) => {
+  const tabId = String(payload.tabId || '').trim();
+  const url = sanitizeBrowserUrl(payload.url || 'https://www.google.com');
+  if (!tabId) return { ok: false, error: 'tabId manquant' };
+  ensureBrowserViewTab(tabId, url);
+  activateBrowserViewTab(tabId);
+  return { ok: true };
+});
+
+ipcMain.handle('browser:activateTab', async (_event, tabId) => {
+  const ok = activateBrowserViewTab(String(tabId || '').trim());
+  return { ok, error: ok ? '' : 'onglet introuvable' };
+});
+
+ipcMain.handle('browser:closeTab', async (_event, tabIdRaw) => {
+  const tabId = String(tabIdRaw || '').trim();
+  const view = browserViews.get(tabId);
+  if (!view) return { ok: false, error: 'onglet introuvable' };
+
+  try { if (mainWindow) mainWindow.removeBrowserView(view); } catch {}
+  browserViews.delete(tabId);
+  try { if (!view.webContents.isDestroyed()) view.webContents.destroy(); } catch {}
+
+  if (activeBrowserTabId === tabId) {
+    const next = browserViews.keys().next().value || null;
+    activeBrowserTabId = next;
+    if (next) activateBrowserViewTab(next);
+    else detachAllBrowserViews();
+  }
+  return { ok: true, activeTabId: activeBrowserTabId };
+});
+
+ipcMain.handle('browser:navigate', async (_event, payload = {}) => {
+  const tabId = String(payload.tabId || '').trim();
+  const view = browserViews.get(tabId);
+  if (!view) return { ok: false, error: 'onglet introuvable' };
+  const url = sanitizeBrowserUrl(payload.url || view.webContents.getURL());
+  try {
+    await view.webContents.loadURL(url);
+    return { ok: true, url };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('browser:goBack', async (_event, tabIdRaw) => {
+  const view = browserViews.get(String(tabIdRaw || '').trim());
+  if (!view) return { ok: false, error: 'onglet introuvable' };
+  if (view.webContents.canGoBack()) view.webContents.goBack();
+  return { ok: true };
+});
+
+ipcMain.handle('browser:goForward', async (_event, tabIdRaw) => {
+  const view = browserViews.get(String(tabIdRaw || '').trim());
+  if (!view) return { ok: false, error: 'onglet introuvable' };
+  if (view.webContents.canGoForward()) view.webContents.goForward();
+  return { ok: true };
+});
+
+ipcMain.handle('browser:reload', async (_event, tabIdRaw) => {
+  const view = browserViews.get(String(tabIdRaw || '').trim());
+  if (!view) return { ok: false, error: 'onglet introuvable' };
+  view.webContents.reload();
+  return { ok: true };
+});
+
+ipcMain.handle('browser:setVisible', async (_event, visibleRaw) => {
+  browserVisible = !!visibleRaw;
+  if (!browserVisible) {
+    detachAllBrowserViews();
+    return { ok: true };
+  }
+  if (activeBrowserTabId && browserViews.has(activeBrowserTabId) && mainWindow) {
+    try { mainWindow.addBrowserView(browserViews.get(activeBrowserTabId)); } catch {}
+    applyBrowserViewLayout();
+  }
+  return { ok: true };
+});
+
+ipcMain.handle('browser:setBounds', async (_event, bounds = {}) => {
+  browserBounds = {
+    x: Number(bounds.x || 0),
+    y: Number(bounds.y || 0),
+    width: Number(bounds.width || 0),
+    height: Number(bounds.height || 0),
+  };
+  applyBrowserViewLayout();
+  return { ok: true };
+});
+
+ipcMain.handle('browser:autofillGithub', async (_event, payload = {}) => {
+  const tabId = String(payload.tabId || '').trim();
+  const username = String(payload.username || '');
+  const password = String(payload.password || '');
+  const view = browserViews.get(tabId);
+  if (!view) return { ok: false, error: 'onglet introuvable' };
+
+  const js = `(() => {
+    const user = ${JSON.stringify(username)};
+    const pass = ${JSON.stringify(password)};
+    const userInput = document.querySelector('input[name="login"], input#login_field, input[type="email"]');
+    const passInput = document.querySelector('input[name="password"], input#password');
+    if (userInput) userInput.value = user;
+    if (passInput) passInput.value = pass;
+    return { ok: !!(userInput && passInput) };
+  })();`;
+
+  try {
+    const result = await view.webContents.executeJavaScript(js, true);
+    return { ok: true, filled: !!(result && result.ok) };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('passwordVault:status', async () => {
+  return {
+    ok: true,
+    encryptionAvailable: passwordEncryptionAvailable(),
+  };
+});
+
+ipcMain.handle('passwordVault:list', async () => {
+  try {
+    return { ok: true, entries: listVaultEntriesDecrypted() };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err), entries: [] };
+  }
+});
+
+ipcMain.handle('passwordVault:upsert', async (_event, payload = {}) => {
+  try {
+    if (!passwordEncryptionAvailable()) {
+      return { ok: false, error: 'Chiffrement indisponible sur cette machine.' };
+    }
+    const origin = normalizeCredentialOrigin(payload.origin || '');
+    const username = String(payload.username || '').trim();
+    const password = String(payload.password || '');
+    const label = String(payload.label || '').trim();
+    if (!origin) return { ok: false, error: 'Origine invalide.' };
+    if (!username || !password) return { ok: false, error: 'Identifiant et mot de passe requis.' };
+
+    const nowIso = new Date().toISOString();
+    const vault = readPasswordVault();
+    const wantedId = String(payload.id || '').trim();
+    const existingIdx = wantedId
+      ? vault.entries.findIndex((entry) => entry.id === wantedId)
+      : vault.entries.findIndex((entry) => entry.origin === origin && decryptVaultSecret(entry.usernameEnc) === username);
+
+    const nextEntry = {
+      id: wantedId || ('cred-' + Math.random().toString(36).slice(2, 10)),
+      origin,
+      label,
+      usernameEnc: encryptVaultSecret(username),
+      passwordEnc: encryptVaultSecret(password),
+      updatedAt: nowIso,
+      createdAt: nowIso,
+    };
+
+    if (existingIdx >= 0) {
+      nextEntry.id = vault.entries[existingIdx].id;
+      nextEntry.createdAt = vault.entries[existingIdx].createdAt || nowIso;
+      vault.entries[existingIdx] = nextEntry;
+    } else {
+      vault.entries.push(nextEntry);
+    }
+
+    writePasswordVault(vault);
+    return { ok: true, entryId: nextEntry.id };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('passwordVault:delete', async (_event, credentialId) => {
+  try {
+    const id = String(credentialId || '').trim();
+    if (!id) return { ok: false, error: 'Id credential manquant.' };
+    const vault = readPasswordVault();
+    vault.entries = vault.entries.filter((entry) => entry.id !== id);
+    writePasswordVault(vault);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('passwordVault:findByOrigin', async (_event, rawOrigin) => {
+  try {
+    const origin = normalizeCredentialOrigin(rawOrigin || '');
+    if (!origin) return { ok: true, entry: null };
+    const vault = readPasswordVault();
+    const found = vault.entries.find((entry) => entry.origin === origin) || null;
+    if (!found) return { ok: true, entry: null };
+    return {
+      ok: true,
+      entry: {
+        id: found.id,
+        origin: found.origin,
+        label: found.label || '',
+        username: decryptVaultSecret(found.usernameEnc),
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err), entry: null };
+  }
+});
+
+ipcMain.handle('browser:autofillSavedCredential', async (_event, payload = {}) => {
+  try {
+    const tabId = String(payload.tabId || '').trim();
+    const credentialId = String(payload.credentialId || '').trim();
+    const view = browserViews.get(tabId);
+    if (!view) return { ok: false, error: 'onglet introuvable' };
+
+    const entry = getVaultEntryById(credentialId);
+    if (!entry) return { ok: false, error: 'credential introuvable' };
+
+    const username = decryptVaultSecret(entry.usernameEnc);
+    const password = decryptVaultSecret(entry.passwordEnc);
+    if (!username || !password) {
+      return { ok: false, error: 'credential invalide ou non dechiffrable' };
+    }
+
+    const result = await view.webContents.executeJavaScript(autofillLoginFormScript(username, password), true);
+    return { ok: true, filled: !!(result && result.ok) };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
 
 /* ═══════════════════════════════════════════════════════
    IPC Handlers — Window Controls
