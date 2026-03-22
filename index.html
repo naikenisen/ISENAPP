@@ -86,6 +86,12 @@
             -webkit-user-select: text;
         }
 
+        /* Re-enable text selection in the graph file reader */
+        .graph-reader-body, .graph-reader-body * {
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
         /* ─── Custom Titlebar ─────────────────────────── */
         .titlebar {
             display: flex;
@@ -1236,6 +1242,17 @@
         .graph-stats {
             display: flex; gap: 1rem; padding: 0.25rem 0.6rem 0.4rem; font-size: 0.7rem; color: var(--text-muted);
         }
+        .graph-repulsion-ctrl {
+            padding: 0.25rem 0.6rem 0.5rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .graph-repulsion-ctrl label {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.25rem;
+        }
+        .graph-repulsion-ctrl input[type="range"] {
+            width: 100%; cursor: pointer; accent-color: var(--accent-blue);
+        }
 
         /* ─── Responsive ─────────────────────────────── */
         @media (max-width: 600px) {
@@ -1517,6 +1534,13 @@
                 <label><input type="checkbox" checked data-group="mail" onchange="toggleGraphGroup(this)"> <i class="icon-mail"></i> Mails</label>
                 <label><input type="checkbox" checked data-group="attachment" onchange="toggleGraphGroup(this)"> <i class="icon-paperclip"></i> Fichiers</label>
                 <label><input type="checkbox" checked data-group="orphan" onchange="toggleGraphGroup(this)"> <i class="icon-circle-dashed"></i> Orphelins</label>
+            </div>
+            <div class="graph-repulsion-ctrl">
+                <label>
+                    <span>Répulsion</span>
+                    <span id="graphRepulsionVal">120</span>
+                </label>
+                <input type="range" id="graphRepulsionSlider" min="10" max="500" step="10" value="120" oninput="setGraphRepulsion(+this.value)">
             </div>
             <div class="graph-stats" id="graphStats"></div>
             <div class="graph-node-list" id="graphNodeList"></div>
@@ -4372,6 +4396,7 @@ let graphPathLookup = {};
 let selectedGraphNode = null;
 let graphTickQueued = false;
 let graphCurrentZoomK = 1;
+let graphRepulsionStrength = 120;
 
 let graphDataLoaded = false;
 
@@ -4454,7 +4479,7 @@ function buildD3Graph(subNodes, subEdges, highlightIds) {
     // Nodes
     const node = d3SvgG.append('g').attr('class', 'nodes')
         .selectAll('circle').data(nodes).join('circle')
-        .attr('r', d => d.type === 'orphan' ? 3 : (d.type === 'attachment' ? 4 : 5))
+        .attr('r', d => d.type === 'orphan' ? 2 : (d.type === 'attachment' ? 3 : 4))
         .attr('fill', d => GROUP_COLORS[d.group] || '#6c7086')
         .attr('stroke', d => highlightIds && highlightIds.has(d.id) ? '#cdd6f4' : '#1e1e2e')
         .attr('stroke-width', d => highlightIds && highlightIds.has(d.id) ? 1.5 : 0.5)
@@ -4474,8 +4499,8 @@ function buildD3Graph(subNodes, subEdges, highlightIds) {
     const label = d3SvgG.append('g').attr('class', 'labels')
         .selectAll('text').data(nodes).join('text')
         .text(d => d.label.length > 25 ? d.label.slice(0, 22) + '…' : d.label)
-        .attr('font-size', 7).attr('fill', '#6c7086')
-        .attr('text-anchor', 'middle').attr('dy', d => (d.type === 'orphan' ? 8 : 12))
+        .attr('font-size', 6).attr('fill', '#6c7086')
+        .attr('text-anchor', 'middle').attr('dy', d => (d.type === 'orphan' ? 6 : 10))
         .attr('pointer-events', 'none')
         .style('display', 'none');
 
@@ -4494,10 +4519,10 @@ function buildD3Graph(subNodes, subEdges, highlightIds) {
     }
 
     d3Sim = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(60))
-        .force('charge', d3.forceManyBody().strength(-50).distanceMax(300))
+        .force('link', d3.forceLink(links).id(d => d.id).distance(90))
+        .force('charge', d3.forceManyBody().strength(-graphRepulsionStrength).distanceMax(400))
         .force('center', d3.forceCenter(W / 2, H / 2))
-        .force('collision', d3.forceCollide().radius(8))
+        .force('collision', d3.forceCollide().radius(6))
         .alphaDecay(0.04)
         .on('tick', () => {
             if (!graphTickQueued) {
@@ -4553,7 +4578,7 @@ function highlightGraphNode(d, nodes, links) {
         if (tgt === d.id) neighborIds.add(src);
     });
     refs.node.attr('opacity', n => neighborIds.has(n.id) ? 1 : 0.1)
-        .attr('r', n => n.id === d.id ? 8 : (n.type === 'orphan' ? 3 : (n.type === 'attachment' ? 4 : 5)));
+        .attr('r', n => n.id === d.id ? 6 : (n.type === 'orphan' ? 2 : (n.type === 'attachment' ? 3 : 4)));
     refs.link.attr('opacity', l => {
         const src = typeof l.source === 'object' ? l.source.id : l.source;
         const tgt = typeof l.target === 'object' ? l.target.id : l.target;
@@ -4572,11 +4597,21 @@ function clearGraphHighlight(nodes, links) {
     const svg = d3.select('#graphSvg');
     const refs = svg.node()?.__d3refs;
     if (!refs) return;
-    refs.node.attr('opacity', 1).attr('r', d => d.type === 'orphan' ? 3 : (d.type === 'attachment' ? 4 : 5));
+    refs.node.attr('opacity', 1).attr('r', d => d.type === 'orphan' ? 2 : (d.type === 'attachment' ? 3 : 4));
     refs.link.attr('opacity', 0.5).attr('stroke', '#313244');
     refs.label.attr('opacity', 1);
     updateLabelsVisibility(graphCurrentZoomK);
     document.querySelectorAll('#graphNodeList .node-item').forEach(el => el.classList.remove('active'));
+}
+
+function setGraphRepulsion(value) {
+    graphRepulsionStrength = value;
+    const label = document.getElementById('graphRepulsionVal');
+    if (label) label.textContent = value;
+    if (d3Sim) {
+        d3Sim.force('charge', d3.forceManyBody().strength(-value).distanceMax(400));
+        d3Sim.alpha(0.3).restart();
+    }
 }
 
 function rebuildGraphPathLookup() {
