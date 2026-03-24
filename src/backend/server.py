@@ -15,7 +15,6 @@ import os
 import poplib
 import re
 import secrets
-import shutil
 import smtplib
 import socket
 import ssl
@@ -23,6 +22,7 @@ import subprocess
 import time
 import urllib.request
 import urllib.parse
+import urllib.error
 from urllib.parse import parse_qs, urlparse
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -32,7 +32,65 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import getaddresses, parsedate_to_datetime
-from pathlib import Path
+
+from app_config import (
+    CONTACTS_CSV,
+    DATA,
+    DIR,
+    DOWNLOADS,
+    GOOGLE_CALENDAR_SCOPE,
+    GOOGLE_MAIL_SCOPE,
+    INBOX_INDEX_FILE,
+    LOG_FILE,
+    MAILS_DIR,
+    OBSIDIAN_ATT_DIR,
+    OBSIDIAN_MD_DIR,
+    OBSIDIAN_VAULT,
+    PORT,
+    PROJECT_ROOT,
+    RENDERER_INDEX,
+    SEEN_UIDS_FILE,
+)
+from account_store import (
+    find_account_by_email,
+    find_account_index_by_email,
+    load_accounts,
+    normalize_auth_fields,
+    save_accounts,
+)
+from calendar_routes import (
+    handle_calendar_accounts_get,
+    handle_calendar_calendars_get,
+    handle_calendar_event_create_post,
+    handle_calendar_event_delete_post,
+    handle_calendar_event_update_post,
+    handle_calendar_events_get,
+    handle_oauth_callback,
+)
+from google_calendar_service import (
+    build_calendar_http_error_response,
+    build_oauth_callback_page,
+    create_google_calendar_event,
+    delete_google_calendar_event,
+    exchange_google_auth_code,
+    generate_pkce_pair,
+    get_valid_gmail_access_token,
+    get_google_oauth_accounts,
+    list_google_calendars,
+    list_google_calendar_events,
+    parse_google_error_payload,
+    pick_google_oauth_account,
+    update_google_calendar_event,
+)
+from mail_service import (
+    build_xoauth2_string as _build_xoauth2_string_impl,
+    delete_mail_on_server as _delete_mail_on_server_impl,
+    fetch_imap as _fetch_imap_impl,
+    fetch_pop3 as _fetch_pop3_impl,
+    send_email_smtp as _send_email_smtp_impl,
+    smtp_auth_xoauth2 as _smtp_auth_xoauth2_impl,
+)
+from json_store import atomic_write_json, read_json_with_backup
 
 try:
     import html2text
@@ -40,104 +98,8 @@ try:
 except ImportError:
     HAS_HTML2TEXT = False
 
-PORT = 8080
-DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = str(Path(DIR).resolve().parents[1])
-BUNDLED_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-RENDERER_INDEX = os.path.join(PROJECT_ROOT, "src", "renderer", "index.html")
-
-
-def get_app_data_dir():
-    """Return a writable data directory for runtime files.
-
-    Runtime data is always stored outside the source tree so secrets/config are
-    per-installation and never written to the git repository.
-
-    Priority:
-    1) ISENAPP_DATA_DIR env var (explicit override)
-    2) XDG_DATA_HOME/isenapp
-    3) ~/.local/share/isenapp
-    """
-    env_override = os.environ.get("ISENAPP_DATA_DIR", "").strip()
-    if env_override:
-        return env_override
-
-    xdg_data_home = os.environ.get("XDG_DATA_HOME", "").strip()
-    if xdg_data_home:
-        return os.path.join(xdg_data_home, "isenapp")
-
-    return os.path.join(str(Path.home()), ".local", "share", "isenapp")
-
-
-APP_DATA_DIR = get_app_data_dir()
-os.makedirs(APP_DATA_DIR, exist_ok=True)
-
-
-def bootstrap_file(filename):
-    """Copy bundled defaults to writable app data dir when missing."""
-    src = os.path.join(BUNDLED_DATA_DIR, filename)
-    if not os.path.isfile(src):
-        src = os.path.join(DIR, filename)
-    dst = os.path.join(APP_DATA_DIR, filename)
-    if os.path.isfile(src) and not os.path.exists(dst):
-        shutil.copy2(src, dst)
-    return dst if os.path.exists(dst) else src
-
-
-def read_json_with_backup(path, default_value):
-    """Read JSON file with fallback to <file>.bak if primary is unreadable."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        bak_path = f"{path}.bak"
-        try:
-            with open(bak_path, encoding="utf-8") as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return default_value
-
-
-def atomic_write_json(path, payload):
-    """Write JSON atomically and keep a one-file backup of previous content."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp_path = f"{path}.tmp"
-    bak_path = f"{path}.bak"
-
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-
-    if os.path.exists(path):
-        shutil.copy2(path, bak_path)
-    os.replace(tmp_path, path)
-
-
-DATA = bootstrap_file("data.json")
-CONTACTS_CSV = bootstrap_file("contacts_complets_v2.csv")
-LOG_FILE = os.path.join(APP_DATA_DIR, "api_errors.log")
-DOWNLOADS = str(Path.home() / "Téléchargements")
-
-# ── Mail storage ──
-MAILS_DIR = str(Path.home() / "mails")
-SEEN_UIDS_FILE = os.path.join(APP_DATA_DIR, "seen_uids.json")
-ACCOUNTS_FILE = os.path.join(APP_DATA_DIR, "accounts.json")
-INBOX_INDEX_FILE = os.path.join(APP_DATA_DIR, "inbox_index.json")
-
-ISENAPP_DATA = str(Path.home() / "Documents" / "isenapp_mails")
-OBSIDIAN_MD_DIR = os.path.join(ISENAPP_DATA, "mails")
-OBSIDIAN_ATT_DIR = os.path.join(ISENAPP_DATA, "attachements")
-OBSIDIAN_VAULT = ISENAPP_DATA
-
-os.makedirs(MAILS_DIR, exist_ok=True)
-os.makedirs(OBSIDIAN_MD_DIR, exist_ok=True)
-os.makedirs(OBSIDIAN_ATT_DIR, exist_ok=True)
-
 # In-memory OAuth state store (state -> metadata) for current server process.
 GOOGLE_OAUTH_PENDING = {}
-GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar"
-GOOGLE_MAIL_SCOPE = "https://mail.google.com/"
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -145,10 +107,6 @@ logging.basicConfig(
     level=logging.ERROR,
 )
 logger = logging.getLogger("todoapp")
-if not os.path.isdir(DOWNLOADS):
-    DOWNLOADS = str(Path.home() / "Downloads")
-if not os.path.isdir(DOWNLOADS):
-    DOWNLOADS = str(Path.home())
 
 
 def loadAppState():
@@ -292,565 +250,12 @@ def save_eml_to_downloads(from_addr, to_addr, subject, body_text, html_body=None
     return filepath
 
 
-# ═══════════════════════════════════════════════════════
-#  Accounts Management
-# ═══════════════════════════════════════════════════════
-def load_accounts():
-    accounts = read_json_with_backup(ACCOUNTS_FILE, [])
-    if not isinstance(accounts, list):
-        return []
-    for acc in accounts:
-        normalize_auth_fields(acc)
-    return accounts
-
-
-def save_accounts(accounts):
-    atomic_write_json(ACCOUNTS_FILE, accounts)
-
-
-def normalize_auth_fields(account):
-    """Normalize auth/provider fields for backward compatibility."""
-    provider = (account.get("provider", "") or "").lower()
-    auth_type = (account.get("auth_type", "") or "").lower()
-    if provider == "gmail_oauth" and not auth_type:
-        auth_type = "oauth2"
-    if auth_type:
-        account["auth_type"] = auth_type
-    return account
-
-
-def find_account_index_by_email(accounts, email_addr):
-    target = (email_addr or "").strip().lower()
-    for idx, acc in enumerate(accounts):
-        if (acc.get("email", "") or "").strip().lower() == target:
-            return idx
-    return -1
-
-
-def build_oauth_callback_page(ok, message):
-    color = "#34d399" if ok else "#ef4444"
-    icon = "✅" if ok else "❌"
-    title = "Connexion Gmail réussie" if ok else "Connexion Gmail échouée"
-    return f"""<!doctype html>
-<html lang=\"fr\"><head><meta charset=\"utf-8\"><title>{title}</title>
-<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>
-<body style=\"font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:1rem\">
-  <div style=\"max-width:560px;width:100%;background:#111827;border:1px solid #374151;border-radius:12px;padding:1rem 1.2rem;box-shadow:0 8px 30px rgba(0,0,0,.35)\">
-    <h1 style=\"margin:.1rem 0 .6rem 0;font-size:1.2rem;color:{color}\">{icon} {title}</h1>
-    <p style=\"line-height:1.5;margin:0 0 .7rem 0\">{message}</p>
-    <p style=\"line-height:1.5;margin:0;color:#94a3b8\">Tu peux maintenant fermer cet onglet et revenir dans ISENAPP.</p>
-  </div>
-</body></html>"""
-
-
-def _b64url(data_bytes):
-    return base64.urlsafe_b64encode(data_bytes).decode().rstrip("=")
-
-
-def generate_pkce_pair():
-    verifier = _b64url(secrets.token_bytes(64))
-    challenge = _b64url(hashlib.sha256(verifier.encode("utf-8")).digest())
-    return verifier, challenge
-
-
-def exchange_google_auth_code(client_id, client_secret, redirect_uri, code, code_verifier):
-    payload = {
-        "grant_type": "authorization_code",
-        "client_id": client_id,
-        "code": code,
-        "redirect_uri": redirect_uri,
-        "code_verifier": code_verifier,
-    }
-    if client_secret:
-        payload["client_secret"] = client_secret
-
-    body = urllib.parse.urlencode(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://oauth2.googleapis.com/token",
-        data=body,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read())
-
-
-def refresh_google_token(account):
-    refresh_token = (account.get("oauth_refresh_token", "") or "").strip()
-    client_id = (account.get("oauth_client_id", "") or "").strip()
-    client_secret = (account.get("oauth_client_secret", "") or "").strip()
-    if not refresh_token:
-        raise RuntimeError("Refresh token Gmail manquant. Reconnecte le compte OAuth.")
-    if not client_id:
-        raise RuntimeError("Client ID OAuth manquant pour ce compte Gmail.")
-
-    payload = {
-        "grant_type": "refresh_token",
-        "client_id": client_id,
-        "refresh_token": refresh_token,
-    }
-    if client_secret:
-        payload["client_secret"] = client_secret
-
-    body = urllib.parse.urlencode(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://oauth2.googleapis.com/token",
-        data=body,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        token_data = json.loads(resp.read())
-
-    access_token = token_data.get("access_token", "")
-    expires_in = int(token_data.get("expires_in", 3600))
-    if not access_token:
-        raise RuntimeError("Google OAuth: access_token absent après refresh.")
-
-    account["oauth_access_token"] = access_token
-    account["oauth_token_expiry"] = int(time.time()) + max(30, expires_in - 30)
-    if token_data.get("refresh_token"):
-        account["oauth_refresh_token"] = token_data["refresh_token"]
-
-    return account
-
-
-def get_valid_gmail_access_token(account_email):
-    """Load account from storage, refresh token when needed, and return valid token."""
-    accounts = load_accounts()
-    idx = find_account_index_by_email(accounts, account_email)
-    if idx < 0:
-        raise RuntimeError(f"Compte introuvable: {account_email}")
-
-    account = normalize_auth_fields(accounts[idx])
-    if account.get("auth_type") != "oauth2":
-        raise RuntimeError("Ce compte n'est pas configuré en OAuth 2.0.")
-
-    now = int(time.time())
-    access_token = (account.get("oauth_access_token", "") or "").strip()
-    expiry = int(account.get("oauth_token_expiry", 0) or 0)
-
-    if access_token and expiry > now + 60:
-        return access_token
-
-    try:
-        account = refresh_google_token(account)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Google OAuth refresh HTTP {e.code}: {body}")
-    except Exception as e:
-        raise RuntimeError(f"Refresh token Gmail impossible: {e}")
-
-    accounts[idx] = account
-    save_accounts(accounts)
-    return account.get("oauth_access_token", "")
-
-
-def get_google_oauth_accounts():
-    """Return enabled OAuth2 accounts suitable for Google APIs."""
-    oauth_accounts = []
-    for acc in load_accounts():
-        acc = normalize_auth_fields(acc)
-        if acc.get("enabled", True) is False:
-            continue
-        if acc.get("auth_type") != "oauth2":
-            continue
-        email_addr = (acc.get("email", "") or "").strip()
-        if not email_addr:
-            continue
-        oauth_accounts.append(acc)
-    return oauth_accounts
-
-
-def pick_google_oauth_account(preferred_email=""):
-    """Pick an OAuth account; prefer the requested email when available."""
-    accounts = get_google_oauth_accounts()
-    if preferred_email:
-        target = preferred_email.strip().lower()
-        for acc in accounts:
-            if (acc.get("email", "") or "").strip().lower() == target:
-                return acc
-    return accounts[0] if accounts else None
-
-
-def map_google_calendar_event(ev, calendar_meta=None, calendar_id="primary"):
-    """Normalize Google Calendar event payload for frontend use."""
-    start_data = ev.get("start", {}) or {}
-    end_data = ev.get("end", {}) or {}
-    start_value = start_data.get("dateTime") or start_data.get("date") or ""
-    end_value = end_data.get("dateTime") or end_data.get("date") or ""
-    calendar_meta = calendar_meta or {}
-    return {
-        "id": ev.get("id", ""),
-        "summary": ev.get("summary", "(Sans titre)"),
-        "description": ev.get("description", "") or "",
-        "location": ev.get("location", "") or "",
-        "start": start_value,
-        "end": end_value,
-        "allDay": bool(start_data.get("date") and not start_data.get("dateTime")),
-        "htmlLink": ev.get("htmlLink", "") or "",
-        "status": ev.get("status", "") or "",
-        "calendarId": calendar_id,
-        "calendarName": calendar_meta.get("summary", calendar_id),
-        "calendarColor": calendar_meta.get("backgroundColor", "#6c8aff"),
-        "calendarTextColor": calendar_meta.get("foregroundColor", "#ffffff"),
-        "canEdit": bool(calendar_meta.get("canEdit", True)),
-    }
-
-
-def normalize_google_calendar_datetime(dt_raw):
-    """Normalize local/naive datetime string to RFC3339 with timezone."""
-    value = (dt_raw or "").strip()
-    if not value:
-        raise RuntimeError("Date/heure manquante.")
-
-    # Accept trailing Z and convert to an ISO offset so fromisoformat can parse it.
-    candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
-    try:
-        dt = datetime.fromisoformat(candidate)
-    except ValueError:
-        raise RuntimeError("Format date/heure invalide (ISO attendu).")
-
-    # Google Calendar rejects dateTime without timezone in many cases.
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
-
-    return dt.isoformat(timespec="seconds")
-
-
-def list_google_calendars(account_email):
-    """Fetch the account calendar list with colors and edit rights."""
-    access_token = get_valid_gmail_access_token(account_email)
-    params = {
-        "minAccessRole": "reader",
-        "maxResults": 2500,
-    }
-    url = (
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList?"
-        + urllib.parse.urlencode(params)
-    )
-    req = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    with urllib.request.urlopen(req, timeout=25) as resp:
-        payload = json.loads(resp.read())
-
-    items = payload.get("items", []) if isinstance(payload, dict) else []
-    calendars = []
-    for cal in items:
-        cal_id = (cal.get("id", "") or "").strip()
-        if not cal_id:
-            continue
-        access_role = (cal.get("accessRole", "") or "").strip().lower()
-        calendars.append({
-            "id": cal_id,
-            "summary": cal.get("summary", cal_id),
-            "backgroundColor": cal.get("backgroundColor", "#6c8aff"),
-            "foregroundColor": cal.get("foregroundColor", "#ffffff"),
-            "primary": bool(cal.get("primary", False)),
-            "selected": bool(cal.get("selected", True)),
-            "accessRole": access_role,
-            "canEdit": access_role in {"owner", "writer"},
-        })
-    return calendars
-
-
-def list_google_calendar_events(account_email, time_min_iso, time_max_iso, calendar_ids=None):
-    """Fetch Google Calendar events for an arbitrary time range and calendars."""
-    access_token = get_valid_gmail_access_token(account_email)
-    calendars = list_google_calendars(account_email)
-    calendars_by_id = {c["id"]: c for c in calendars}
-
-    if calendar_ids:
-        target_ids = [c for c in calendar_ids if c in calendars_by_id]
-    else:
-        target_ids = [c["id"] for c in calendars]
-
-    if not target_ids:
-        target_ids = ["primary"]
-
-    events = []
-    for cal_id in target_ids:
-        params = {
-            "timeMin": time_min_iso,
-            "timeMax": time_max_iso,
-            "singleEvents": "true",
-            "orderBy": "startTime",
-            "maxResults": 2500,
-        }
-        url = (
-            "https://www.googleapis.com/calendar/v3/calendars/"
-            + urllib.parse.quote(cal_id, safe="")
-            + "/events?"
-            + urllib.parse.urlencode(params)
-        )
-        req = urllib.request.Request(
-            url,
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            payload = json.loads(resp.read())
-
-        items = payload.get("items", []) if isinstance(payload, dict) else []
-        calendar_meta = calendars_by_id.get(cal_id, {
-            "summary": cal_id,
-            "backgroundColor": "#6c8aff",
-            "foregroundColor": "#ffffff",
-            "canEdit": True,
-        })
-        for ev in items:
-            events.append(map_google_calendar_event(ev, calendar_meta=calendar_meta, calendar_id=cal_id))
-
-    return {
-        "events": events,
-        "calendars": calendars,
-    }
-
-
-def create_google_calendar_event(account_email, payload):
-    """Create an event in the primary Google Calendar."""
-    access_token = get_valid_gmail_access_token(account_email)
-    calendar_id = (payload.get("calendarId", "") or "").strip() or "primary"
-    summary = (payload.get("summary", "") or "").strip()
-    if not summary:
-        raise RuntimeError("Le titre (summary) est requis.")
-
-    all_day = bool(payload.get("allDay"))
-    event_data = {
-        "summary": summary,
-        "description": (payload.get("description", "") or "").strip(),
-        "location": (payload.get("location", "") or "").strip(),
-    }
-
-    if all_day:
-        start_date = (payload.get("startDate", "") or "").strip()
-        end_date = (payload.get("endDate", "") or "").strip()
-        if not start_date:
-            raise RuntimeError("Date de début requise pour un événement journée entière.")
-
-        try:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            if end_date:
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-            else:
-                end_dt = start_dt + timedelta(days=1)
-            if end_dt <= start_dt:
-                end_dt = start_dt + timedelta(days=1)
-        except ValueError:
-            raise RuntimeError("Format de date invalide (AAAA-MM-JJ attendu).")
-
-        event_data["start"] = {"date": start_dt.strftime("%Y-%m-%d")}
-        event_data["end"] = {"date": end_dt.strftime("%Y-%m-%d")}
-    else:
-        start_dt_iso = (payload.get("startDateTime", "") or "").strip()
-        end_dt_iso = (payload.get("endDateTime", "") or "").strip()
-        if not start_dt_iso or not end_dt_iso:
-            raise RuntimeError("Dates/horaires de début et fin requis.")
-
-        event_data["start"] = {"dateTime": normalize_google_calendar_datetime(start_dt_iso)}
-        event_data["end"] = {"dateTime": normalize_google_calendar_datetime(end_dt_iso)}
-
-    body = json.dumps(event_data).encode("utf-8")
-    req = urllib.request.Request(
-        "https://www.googleapis.com/calendar/v3/calendars/"
-        + urllib.parse.quote(calendar_id, safe="")
-        + "/events",
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=25) as resp:
-        created = json.loads(resp.read())
-    calendars = list_google_calendars(account_email)
-    meta = next((c for c in calendars if c["id"] == calendar_id), None) or {}
-    return map_google_calendar_event(created, calendar_meta=meta, calendar_id=calendar_id)
-
-
-def update_google_calendar_event(account_email, payload):
-    """Patch an existing event on a specific calendar."""
-    access_token = get_valid_gmail_access_token(account_email)
-    calendar_id = (payload.get("calendarId", "") or "").strip() or "primary"
-    event_id = (payload.get("eventId", "") or "").strip()
-    if not event_id:
-        raise RuntimeError("eventId requis.")
-
-    body_payload = {}
-    if "summary" in payload:
-        body_payload["summary"] = (payload.get("summary", "") or "").strip()
-    if "description" in payload:
-        body_payload["description"] = payload.get("description", "") or ""
-    if "location" in payload:
-        body_payload["location"] = payload.get("location", "") or ""
-
-    if payload.get("allDay") is True:
-        start_date = (payload.get("startDate", "") or "").strip()
-        end_date = (payload.get("endDate", "") or "").strip()
-        if not start_date:
-            raise RuntimeError("startDate requis pour un événement journée entière.")
-        if not end_date:
-            end_dt = datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=1)
-            end_date = end_dt.strftime("%Y-%m-%d")
-        body_payload["start"] = {"date": start_date}
-        body_payload["end"] = {"date": end_date}
-    elif payload.get("allDay") is False:
-        start_dt_iso = (payload.get("startDateTime", "") or "").strip()
-        end_dt_iso = (payload.get("endDateTime", "") or "").strip()
-        if not start_dt_iso or not end_dt_iso:
-            raise RuntimeError("startDateTime/endDateTime requis pour un événement horaire.")
-        body_payload["start"] = {"dateTime": normalize_google_calendar_datetime(start_dt_iso)}
-        body_payload["end"] = {"dateTime": normalize_google_calendar_datetime(end_dt_iso)}
-
-    if not body_payload:
-        raise RuntimeError("Aucune propriété à mettre à jour.")
-
-    body = json.dumps(body_payload).encode("utf-8")
-    url = (
-        "https://www.googleapis.com/calendar/v3/calendars/"
-        + urllib.parse.quote(calendar_id, safe="")
-        + "/events/"
-        + urllib.parse.quote(event_id, safe="")
-    )
-    req = urllib.request.Request(
-        url,
-        data=body,
-        method="PATCH",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=25) as resp:
-        updated = json.loads(resp.read())
-
-    calendars = list_google_calendars(account_email)
-    meta = next((c for c in calendars if c["id"] == calendar_id), None) or {}
-    return map_google_calendar_event(updated, calendar_meta=meta, calendar_id=calendar_id)
-
-
-def delete_google_calendar_event(account_email, event_id):
-    """Delete an event from the primary Google Calendar."""
-    access_token = get_valid_gmail_access_token(account_email)
-    calendar_id = "primary"
-    if isinstance(event_id, dict):
-        calendar_id = (event_id.get("calendarId", "") or "").strip() or "primary"
-        event_id = event_id.get("eventId", "")
-
-    event_id = (event_id or "").strip()
-    if not event_id:
-        raise RuntimeError("eventId requis.")
-
-    url = (
-        "https://www.googleapis.com/calendar/v3/calendars/"
-        + urllib.parse.quote(calendar_id, safe="")
-        + "/events/"
-        + urllib.parse.quote(event_id, safe="")
-    )
-    req = urllib.request.Request(
-        url,
-        method="DELETE",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    with urllib.request.urlopen(req, timeout=25):
-        return True
-
-
-def parse_google_error_payload(body_text):
-    """Parse Google API error JSON and expose actionable metadata."""
-    info = {
-        "message": body_text,
-        "reason": "",
-        "status": "",
-        "activation_url": "",
-    }
-    try:
-        payload = json.loads(body_text or "{}")
-        err = payload.get("error", {}) if isinstance(payload, dict) else {}
-        if isinstance(err, dict):
-            info["message"] = err.get("message") or info["message"]
-            info["status"] = err.get("status") or ""
-
-            errors = err.get("errors") if isinstance(err.get("errors"), list) else []
-            if errors and isinstance(errors[0], dict):
-                info["reason"] = errors[0].get("reason", "") or info["reason"]
-
-            details = err.get("details") if isinstance(err.get("details"), list) else []
-            for detail in details:
-                if not isinstance(detail, dict):
-                    continue
-                if detail.get("reason"):
-                    info["reason"] = detail.get("reason")
-                links = detail.get("links") if isinstance(detail.get("links"), list) else []
-                for link in links:
-                    if isinstance(link, dict) and link.get("url"):
-                        info["activation_url"] = link.get("url")
-                        break
-                if info["activation_url"]:
-                    break
-
-        if not info["activation_url"] and "console.developers.google.com/apis/api/calendar-json.googleapis.com/overview" in body_text:
-            marker = "https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview"
-            start = body_text.find(marker)
-            if start >= 0:
-                end = body_text.find('"', start)
-                info["activation_url"] = body_text[start:end] if end > start else marker
-    except Exception:
-        pass
-    return info
-
-
-def build_calendar_http_error_response(http_err):
-    """Build a normalized JSON payload for Google Calendar HTTP errors."""
-    body = http_err.read().decode("utf-8", errors="replace")
-    info = parse_google_error_payload(body)
-    reason = (info.get("reason", "") or "").lower()
-    status = (info.get("status", "") or "").upper()
-
-    if reason in {"insufficientpermissions", "access_token_scope_insufficient"}:
-        return {
-            "ok": False,
-            "error_code": "CALENDAR_SCOPE_INSUFFICIENT",
-            "error": "Le token OAuth n'a pas le scope Google Calendar requis.",
-            "details": info.get("message", body),
-        }, 502
-
-    if reason in {"forbiddenfornonorganizer", "forbidden"} or (http_err.code == 403 and status == "PERMISSION_DENIED"):
-        return {
-            "ok": False,
-            "error_code": "CALENDAR_EVENT_FORBIDDEN",
-            "error": "Cet événement ou agenda ne peut pas être modifié avec ce compte.",
-            "details": info.get("message", body),
-        }, 502
-
-    if reason in {"accessnotconfigured", "service_disabled"}:
-        return {
-            "ok": False,
-            "error_code": "CALENDAR_API_DISABLED",
-            "error": "Google Calendar API n'est pas activée pour ce projet Google Cloud.",
-            "details": info.get("message", body),
-            "activation_url": info.get("activation_url", ""),
-        }, 502
-
-    return {
-        "ok": False,
-        "error_code": "CALENDAR_HTTP_ERROR",
-        "error": f"Google Calendar HTTP {http_err.code}",
-        "details": info.get("message", body),
-    }, 502
-
-
 def build_xoauth2_string(username, access_token):
-    raw = f"user={username}\x01auth=Bearer {access_token}\x01\x01"
-    return raw.encode("utf-8")
+    return _build_xoauth2_string_impl(username, access_token)
 
 
 def smtp_auth_xoauth2(server, username, access_token):
-    token = base64.b64encode(build_xoauth2_string(username, access_token)).decode("ascii")
-    code, resp = server.docmd("AUTH", f"XOAUTH2 {token}")
-    if code != 235:
-        detail = resp.decode("utf-8", errors="replace") if isinstance(resp, bytes) else str(resp)
-        raise RuntimeError(f"SMTP OAuth refusé ({code}): {detail}")
+    return _smtp_auth_xoauth2_impl(server, username, access_token)
 
 
 # ═══════════════════════════════════════════════════════
@@ -1070,195 +475,36 @@ def parse_email_metadata(raw_bytes, account_email=""):
 #  POP3 Fetch
 # ═══════════════════════════════════════════════════════
 def fetch_pop3(account):
-    """Fetch emails via POP3 for one account. Returns (new_count, errors)."""
-    server = account.get("pop3_server", "")
-    port = int(account.get("pop3_port", 995))
-    use_ssl = account.get("pop3_ssl", True)
-    username = account.get("username", "")
-    password = account.get("password", "")
-    account_email = account.get("email", username)
-
-    seen = load_seen_uids()
-    account_key = f"{username}@{server}"
-    if account_key not in seen:
-        seen[account_key] = []
-
-    inbox = load_inbox_index()
-    new_count = 0
-    errors = []
-
-    try:
-        if use_ssl:
-            pop = poplib.POP3_SSL(server, port, timeout=30)
-        else:
-            pop = poplib.POP3(server, port, timeout=30)
-
-        pop.user(username)
-        pop.pass_(password)
-
-        count, _ = pop.stat()
-        # Get UIDL for dedup
-        resp, uid_list, _ = pop.uidl()
-        uid_map = {}
-        for entry in uid_list:
-            if isinstance(entry, bytes):
-                entry = entry.decode('utf-8', errors='replace')
-            parts = entry.strip().split(None, 1)
-            if len(parts) == 2:
-                uid_map[parts[0]] = parts[1]
-
-        for msg_num_str, uid in uid_map.items():
-            if uid in seen[account_key]:
-                continue
-
-            msg_num = int(msg_num_str)
-            try:
-                resp_lines, lines, octets = pop.retr(msg_num)
-                raw_bytes = b"\r\n".join(lines)
-
-                mail_id = compute_mail_id(raw_bytes)
-
-                meta = parse_email_metadata(raw_bytes, account_email)
-                eml_filename = unique_eml_filename_from_subject(meta.get("subject", "mail"))
-                eml_path = os.path.join(MAILS_DIR, eml_filename)
-                with open(eml_path, "wb") as f:
-                    f.write(raw_bytes)
-
-                # Parse metadata
-                meta["id"] = mail_id
-                meta["uid"] = uid
-                meta["eml_file"] = eml_filename
-                meta["read"] = False
-                meta["starred"] = False
-                meta["deleted"] = False
-
-                inbox.append(meta)
-                seen[account_key].append(uid)
-                new_count += 1
-
-            except Exception as e:
-                errors.append(f"Message {msg_num}: {e}")
-
-        pop.quit()
-
-    except Exception as e:
-        errors.append(str(e))
-
-    save_seen_uids(seen)
-    save_inbox_index(inbox)
-    return new_count, errors
+    return _fetch_pop3_impl(
+        account,
+        load_seen_uids=load_seen_uids,
+        save_seen_uids=save_seen_uids,
+        load_inbox_index=load_inbox_index,
+        save_inbox_index=save_inbox_index,
+        compute_mail_id=compute_mail_id,
+        parse_email_metadata=parse_email_metadata,
+        unique_eml_filename_from_subject=unique_eml_filename_from_subject,
+        mails_dir=MAILS_DIR,
+    )
 
 
 # ═══════════════════════════════════════════════════════
 #  IMAP Fetch
 # ═══════════════════════════════════════════════════════
 def fetch_imap(account):
-    """Fetch emails via IMAP for one account. Returns (new_count, errors)."""
-    account = normalize_auth_fields(account)
-    server = account.get("imap_server", "")
-    port = int(account.get("imap_port", 993))
-    use_ssl = account.get("imap_ssl", True)
-    username = account.get("username", "")
-    password = account.get("password", "")
-    account_email = account.get("email", username)
-    auth_type = account.get("auth_type", "password")
-    post_action = account.get("imap_post_action", "mark_read")  # mark_read | delete
-
-    seen = load_seen_uids()
-    account_key = f"{username}@{server}"
-    if account_key not in seen:
-        seen[account_key] = []
-
-    inbox = load_inbox_index()
-    new_count = 0
-    errors = []
-
-    try:
-        if use_ssl:
-            imap = imaplib.IMAP4_SSL(server, port)
-        else:
-            imap = imaplib.IMAP4(server, port)
-
-        if auth_type == "oauth2":
-            oauth_user = username or account_email
-            access_token = get_valid_gmail_access_token(account_email)
-            imap.authenticate("XOAUTH2", lambda _: build_xoauth2_string(oauth_user, access_token))
-        else:
-            imap.login(username, password)
-        imap.select("INBOX")
-
-        # Search for all messages
-        status, data = imap.search(None, "ALL")
-        if status != "OK":
-            errors.append("IMAP search failed")
-            imap.logout()
-            return 0, errors
-
-        msg_nums = data[0].split()
-        for num in msg_nums:
-            # Get UID for dedup
-            status, uid_data = imap.fetch(num, "(UID)")
-            if status != "OK":
-                continue
-            uid_str = uid_data[0].decode("utf-8", errors="replace") if isinstance(uid_data[0], bytes) else str(uid_data[0])
-            # Extract UID from response like '1 (UID 123)'
-            uid_match = re.search(r"UID\s+(\d+)", uid_str)
-            if not uid_match:
-                continue
-            uid = uid_match.group(1)
-
-            if uid in seen[account_key]:
-                continue
-
-            # Fetch full message
-            status, msg_data = imap.fetch(num, "(RFC822)")
-            if status != "OK" or not msg_data or not msg_data[0]:
-                continue
-
-            try:
-                raw_bytes = msg_data[0][1]
-                mail_id = compute_mail_id(raw_bytes)
-
-                meta = parse_email_metadata(raw_bytes, account_email)
-                eml_filename = unique_eml_filename_from_subject(meta.get("subject", "mail"))
-                eml_path = os.path.join(MAILS_DIR, eml_filename)
-                with open(eml_path, "wb") as f:
-                    f.write(raw_bytes)
-
-                # Parse metadata
-                meta["id"] = mail_id
-                meta["uid"] = uid
-                meta["eml_file"] = eml_filename
-                meta["read"] = False
-                meta["starred"] = False
-                meta["deleted"] = False
-                meta["protocol"] = "imap"
-
-                inbox.append(meta)
-                seen[account_key].append(uid)
-                new_count += 1
-
-                # Post-fetch action
-                if post_action == "delete":
-                    imap.store(num, "+FLAGS", "\\Deleted")
-                elif post_action == "mark_read":
-                    imap.store(num, "+FLAGS", "\\Seen")
-
-            except Exception as e:
-                errors.append(f"IMAP message {num}: {e}")
-
-        if post_action == "delete":
-            imap.expunge()
-
-        imap.close()
-        imap.logout()
-
-    except Exception as e:
-        errors.append(str(e))
-
-    save_seen_uids(seen)
-    save_inbox_index(inbox)
-    return new_count, errors
+    return _fetch_imap_impl(
+        account,
+        normalize_auth_fields=normalize_auth_fields,
+        get_valid_gmail_access_token=get_valid_gmail_access_token,
+        load_seen_uids=load_seen_uids,
+        save_seen_uids=save_seen_uids,
+        load_inbox_index=load_inbox_index,
+        save_inbox_index=save_inbox_index,
+        compute_mail_id=compute_mail_id,
+        parse_email_metadata=parse_email_metadata,
+        unique_eml_filename_from_subject=unique_eml_filename_from_subject,
+        mails_dir=MAILS_DIR,
+    )
 
 
 def fetch_all_accounts():
@@ -1273,9 +519,31 @@ def fetch_all_accounts():
         try:
             protocol = acc.get("protocol", "pop3").lower()
             if protocol == "imap":
-                n, errs = fetch_imap(acc)
+                n, errs = _fetch_imap_impl(
+                    acc,
+                    normalize_auth_fields=normalize_auth_fields,
+                    get_valid_gmail_access_token=get_valid_gmail_access_token,
+                    load_seen_uids=load_seen_uids,
+                    save_seen_uids=save_seen_uids,
+                    load_inbox_index=load_inbox_index,
+                    save_inbox_index=save_inbox_index,
+                    compute_mail_id=compute_mail_id,
+                    parse_email_metadata=parse_email_metadata,
+                    unique_eml_filename_from_subject=unique_eml_filename_from_subject,
+                    mails_dir=MAILS_DIR,
+                )
             else:
-                n, errs = fetch_pop3(acc)
+                n, errs = _fetch_pop3_impl(
+                    acc,
+                    load_seen_uids=load_seen_uids,
+                    save_seen_uids=save_seen_uids,
+                    load_inbox_index=load_inbox_index,
+                    save_inbox_index=save_inbox_index,
+                    compute_mail_id=compute_mail_id,
+                    parse_email_metadata=parse_email_metadata,
+                    unique_eml_filename_from_subject=unique_eml_filename_from_subject,
+                    mails_dir=MAILS_DIR,
+                )
             total_new += n
             all_errors.extend(errs)
         except Exception as e:
@@ -1413,174 +681,35 @@ def _autoconfig_fallback(domain, email_addr):
 #  SMTP Send
 # ═══════════════════════════════════════════════════════
 def send_email_smtp(account, to_addr, subject, body_text, cc="", attachments=None, html_body=None):
-    """Send email via SMTP using account config. Also saves .eml locally.
-    attachments: list of dicts with keys: filename, content_type, data (base64-encoded)
-    html_body: optional HTML version of the email body (e.g. body + HTML signature)
-    """
-    account = normalize_auth_fields(account)
-    smtp_server = account.get("smtp_server", "")
-    smtp_port = int(account.get("smtp_port", 587))
-    smtp_ssl = account.get("smtp_ssl", False)
-    smtp_starttls = account.get("smtp_starttls", True)
-    username = account.get("username", "")
-    password = account.get("password", "")
-    from_addr = account.get("email", username)
-    auth_type = account.get("auth_type", "password")
-
-    msg = MIMEMultipart("mixed")  # 'mixed' supports both text/html alternatives and file attachments
-    msg["From"] = from_addr
-    msg["To"] = to_addr
-    msg["Subject"] = subject
-    msg["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0100")
-    msg["Message-ID"] = f"<{hashlib.md5((from_addr + to_addr + subject + str(time.time())).encode()).hexdigest()}@isenapp>"
-    if cc:
-        msg["Cc"] = cc
-    if html_body:
-        alt = MIMEMultipart("alternative")
-        alt.attach(MIMEText(body_text, "plain", "utf-8"))
-        alt.attach(MIMEText(html_body, "html", "utf-8"))
-        msg.attach(alt)
-    else:
-        msg.attach(MIMEText(body_text, "plain", "utf-8"))
-
-    # Attach files
-    if attachments:
-        for att in attachments:
-            filename = att.get("filename", "attachment")
-            content_type = att.get("content_type", "application/octet-stream")
-            file_data = base64.b64decode(att.get("data", ""))
-            maintype, subtype = content_type.split("/", 1) if "/" in content_type else ("application", "octet-stream")
-            part = MIMEBase(maintype, subtype)
-            part.set_payload(file_data)
-            encoders.encode_base64(part)
-            part.add_header("Content-Disposition", "attachment", filename=filename)
-            msg.attach(part)
-
-    raw_msg = msg.as_string()
-    raw_bytes = raw_msg.encode("utf-8")
-
-    if smtp_ssl:
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30)
-    else:
-        server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
-        server.ehlo()
-        if smtp_starttls:
-            server.starttls()
-            server.ehlo()
-
-    if auth_type == "oauth2":
-        oauth_user = username or from_addr
-        access_token = get_valid_gmail_access_token(from_addr)
-        smtp_auth_xoauth2(server, oauth_user, access_token)
-    else:
-        server.login(username, password)
-
-    all_recipients = [a.strip() for a in to_addr.split(",")]
-    if cc:
-        all_recipients += [a.strip() for a in cc.split(",")]
-    server.sendmail(from_addr, all_recipients, raw_msg)
-    server.quit()
-
-    # Save sent email locally as .eml in MAILS_DIR using subject as filename
-    mail_id = compute_mail_id(raw_bytes)
-    eml_filename = unique_eml_filename_from_subject(subject)
-    eml_path = os.path.join(MAILS_DIR, eml_filename)
-    with open(eml_path, "wb") as f:
-        f.write(raw_bytes)
-
-    # Add to inbox index as sent mail
-    meta = parse_email_metadata(raw_bytes, from_addr)
-    meta["id"] = mail_id
-    meta["uid"] = ""
-    meta["eml_file"] = eml_filename
-    meta["read"] = True
-    meta["starred"] = False
-    meta["deleted"] = False
-    meta["folder"] = "sent"
-    inbox = load_inbox_index()
-    inbox.append(meta)
-    save_inbox_index(inbox)
-
-    return True
-
-
-def find_account_by_email(email_addr):
-    """Find account config matching a sender email."""
-    accounts = load_accounts()
-    for acc in accounts:
-        if acc.get("email", "").lower() == email_addr.lower():
-            return acc
-    return None
+    return _send_email_smtp_impl(
+        account,
+        to_addr,
+        subject,
+        body_text,
+        cc=cc,
+        attachments=attachments,
+        html_body=html_body,
+        normalize_auth_fields=normalize_auth_fields,
+        get_valid_gmail_access_token=get_valid_gmail_access_token,
+        compute_mail_id=compute_mail_id,
+        unique_eml_filename_from_subject=unique_eml_filename_from_subject,
+        parse_email_metadata=parse_email_metadata,
+        load_inbox_index=load_inbox_index,
+        save_inbox_index=save_inbox_index,
+        mails_dir=MAILS_DIR,
+    )
 
 
 # ═══════════════════════════════════════════════════════
 #  Delete mail from POP3 server
 # ═══════════════════════════════════════════════════════
 def delete_mail_on_server(account, uid_to_delete):
-    """Connect via POP3 or IMAP and delete a message by UID."""
-    account = normalize_auth_fields(account)
-    protocol = account.get("protocol", "pop3").lower()
-
-    if protocol == "imap":
-        server = account.get("imap_server", "")
-        port = int(account.get("imap_port", 993))
-        use_ssl = account.get("imap_ssl", True)
-        username = account.get("username", "")
-        password = account.get("password", "")
-        account_email = account.get("email", username)
-        auth_type = account.get("auth_type", "password")
-
-        if use_ssl:
-            imap = imaplib.IMAP4_SSL(server, port)
-        else:
-            imap = imaplib.IMAP4(server, port)
-
-        if auth_type == "oauth2":
-            oauth_user = username or account_email
-            access_token = get_valid_gmail_access_token(account_email)
-            imap.authenticate("XOAUTH2", lambda _: build_xoauth2_string(oauth_user, access_token))
-        else:
-            imap.login(username, password)
-        imap.select("INBOX")
-
-        status, data = imap.search(None, f"UID {uid_to_delete}")
-        if status == "OK" and data[0]:
-            for num in data[0].split():
-                imap.store(num, "+FLAGS", "\\Deleted")
-            imap.expunge()
-
-        imap.close()
-        imap.logout()
-        return True
-
-    # POP3 fallback
-    server = account.get("pop3_server", "")
-    port = int(account.get("pop3_port", 995))
-    use_ssl = account.get("pop3_ssl", True)
-    username = account.get("username", "")
-    password = account.get("password", "")
-
-    if use_ssl:
-        pop = poplib.POP3_SSL(server, port, timeout=30)
-    else:
-        pop = poplib.POP3(server, port, timeout=30)
-
-    pop.user(username)
-    pop.pass_(password)
-
-    resp, uid_list, _ = pop.uidl()
-    deleted = False
-    for entry in uid_list:
-        if isinstance(entry, bytes):
-            entry = entry.decode('utf-8', errors='replace')
-        parts = entry.strip().split(None, 1)
-        if len(parts) == 2 and parts[1] == uid_to_delete:
-            pop.dele(int(parts[0]))
-            deleted = True
-            break
-
-    pop.quit()
-    return deleted
+    return _delete_mail_on_server_impl(
+        account,
+        uid_to_delete,
+        normalize_auth_fields=normalize_auth_fields,
+        get_valid_gmail_access_token=get_valid_gmail_access_token,
+    )
 
 
 # ═══════════════════════════════════════════════════════
@@ -1889,104 +1018,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return
 
         if self.path.startswith("/api/oauth/google/callback"):
-            try:
-                qs = parse_qs(urlparse(self.path).query)
-                err = (qs.get("error", [""])[0] or "").strip()
-                state = (qs.get("state", [""])[0] or "").strip()
-                code = (qs.get("code", [""])[0] or "").strip()
-
-                if err:
-                    html = build_oauth_callback_page(False, f"Google a renvoyé une erreur: {err}")
-                    self.send_response(400)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(html.encode("utf-8"))
-                    return
-
-                pending = GOOGLE_OAUTH_PENDING.pop(state, None)
-                if not pending:
-                    html = build_oauth_callback_page(False, "État OAuth invalide ou expiré.")
-                    self.send_response(400)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(html.encode("utf-8"))
-                    return
-
-                if not code:
-                    html = build_oauth_callback_page(False, "Code OAuth absent.")
-                    self.send_response(400)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(html.encode("utf-8"))
-                    return
-
-                account_email = pending["account_email"]
-                accounts = load_accounts()
-                idx = find_account_index_by_email(accounts, account_email)
-                if idx < 0:
-                    html = build_oauth_callback_page(False, "Compte cible introuvable. Réessaie depuis l'application.")
-                    self.send_response(404)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(html.encode("utf-8"))
-                    return
-
-                account = normalize_auth_fields(accounts[idx])
-                client_id = (account.get("oauth_client_id", "") or "").strip()
-                client_secret = (account.get("oauth_client_secret", "") or "").strip()
-                redirect_uri = (account.get("oauth_redirect_uri", "") or "").strip() or "http://127.0.0.1:8080/api/oauth/google/callback"
-
-                token_data = exchange_google_auth_code(
-                    client_id=client_id,
-                    client_secret=client_secret,
-                    redirect_uri=redirect_uri,
-                    code=code,
-                    code_verifier=pending["code_verifier"],
-                )
-
-                access_token = token_data.get("access_token", "")
-                refresh_token = token_data.get("refresh_token", "")
-                expires_in = int(token_data.get("expires_in", 3600))
-                if not access_token:
-                    raise RuntimeError("Google OAuth: access_token absent")
-
-                account["provider"] = "gmail_oauth"
-                account["auth_type"] = "oauth2"
-                account["protocol"] = "imap"
-                account["email"] = account_email
-                account["username"] = account_email
-                account["imap_server"] = "imap.gmail.com"
-                account["imap_port"] = 993
-                account["imap_ssl"] = True
-                account["imap_post_action"] = account.get("imap_post_action", "mark_read")
-                account["smtp_server"] = "smtp.gmail.com"
-                account["smtp_port"] = 587
-                account["smtp_ssl"] = False
-                account["smtp_starttls"] = True
-                account["oauth_access_token"] = access_token
-                account["oauth_token_expiry"] = int(time.time()) + max(30, expires_in - 30)
-                if refresh_token:
-                    account["oauth_refresh_token"] = refresh_token
-                granted_scope = (token_data.get("scope", "") or "").strip()
-                if granted_scope:
-                    account["oauth_scope"] = granted_scope
-
-                accounts[idx] = account
-                save_accounts(accounts)
-
-                html = build_oauth_callback_page(True, f"Le compte {account_email} est désormais connecté via Google OAuth 2.0.")
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(html.encode("utf-8"))
-                return
-            except Exception as e:
-                html = build_oauth_callback_page(False, f"Impossible de finaliser OAuth: {e}")
-                self.send_response(500)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(html.encode("utf-8"))
-                return
+            return handle_oauth_callback(
+                self,
+                pending_store=GOOGLE_OAUTH_PENDING,
+                load_accounts=load_accounts,
+                find_account_index_by_email=find_account_index_by_email,
+                normalize_auth_fields=normalize_auth_fields,
+                save_accounts=save_accounts,
+                exchange_google_auth_code=exchange_google_auth_code,
+                build_oauth_callback_page=build_oauth_callback_page,
+                now_ts=lambda: int(time.time()),
+            )
 
         if self.path == "/api/state":
             return self._json(loadAppState())
@@ -1995,124 +1037,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/api/accounts":
             return self._json(load_accounts())
         if self.path == "/api/calendar/accounts":
-            accounts = get_google_oauth_accounts()
-            return self._json([
-                {
-                    "email": (acc.get("email", "") or "").strip(),
-                    "provider": acc.get("provider", ""),
-                    "connected": bool((acc.get("oauth_refresh_token", "") or "").strip()),
-                }
-                for acc in accounts
-            ])
+            return handle_calendar_accounts_get(self, get_google_oauth_accounts=get_google_oauth_accounts)
         if self.path.startswith("/api/calendar/calendars"):
-            try:
-                qs = parse_qs(urlparse(self.path).query)
-                account_email = (qs.get("account", [""])[0] or "").strip()
-                account = pick_google_oauth_account(account_email)
-                if not account:
-                    return self._json({"error": "Aucun compte Google OAuth disponible."}, 404)
-
-                calendars = list_google_calendars(account.get("email", ""))
-                return self._json({
-                    "ok": True,
-                    "account": account.get("email", ""),
-                    "calendars": calendars,
-                })
-            except urllib.error.HTTPError as e:
-                payload, code = build_calendar_http_error_response(e)
-                return self._json(payload, code)
-            except Exception as e:
-                return self._json({"error": str(e)}, 500)
+            return handle_calendar_calendars_get(
+                self,
+                pick_google_oauth_account=pick_google_oauth_account,
+                list_google_calendars=list_google_calendars,
+                build_calendar_http_error_response=build_calendar_http_error_response,
+            )
         if self.path.startswith("/api/calendar/events"):
-            try:
-                qs = parse_qs(urlparse(self.path).query)
-                year_raw = (qs.get("year", [""])[0] or "").strip()
-                month_raw = (qs.get("month", [""])[0] or "").strip()
-                start_raw = (qs.get("start", [""])[0] or "").strip()
-                end_raw = (qs.get("end", [""])[0] or "").strip()
-                account_email = (qs.get("account", [""])[0] or "").strip()
-                calendars_raw = (qs.get("calendars", [""])[0] or "").strip()
-                calendar_ids = [c.strip() for c in calendars_raw.split(",") if c.strip()]
-
-                now = datetime.now()
-                year = int(year_raw) if year_raw.isdigit() else now.year
-                month = int(month_raw) if month_raw.isdigit() else now.month
-
-                if start_raw and end_raw:
-                    try:
-                        start_dt = datetime.strptime(start_raw, "%Y-%m-%d")
-                        end_dt = datetime.strptime(end_raw, "%Y-%m-%d")
-                    except ValueError:
-                        return self._json({"error": "Format start/end invalide (AAAA-MM-JJ attendu)."}, 400)
-
-                    if end_dt <= start_dt:
-                        return self._json({"error": "La date de fin doit être après la date de début."}, 400)
-
-                    time_min_iso = start_dt.strftime("%Y-%m-%dT00:00:00Z")
-                    time_max_iso = end_dt.strftime("%Y-%m-%dT00:00:00Z")
-                else:
-                    if month < 1 or month > 12:
-                        return self._json({"error": "Mois invalide (1-12)."}, 400)
-
-                    start_dt = datetime(year, month, 1)
-                    if month == 12:
-                        end_dt = datetime(year + 1, 1, 1)
-                    else:
-                        end_dt = datetime(year, month + 1, 1)
-                    time_min_iso = start_dt.strftime("%Y-%m-%dT00:00:00Z")
-                    time_max_iso = end_dt.strftime("%Y-%m-%dT00:00:00Z")
-
-                account = pick_google_oauth_account(account_email)
-                if not account:
-                    return self._json({"error": "Aucun compte Google OAuth disponible."}, 404)
-
-                result_data = list_google_calendar_events(
-                    account.get("email", ""),
-                    time_min_iso,
-                    time_max_iso,
-                    calendar_ids=calendar_ids,
-                )
-                return self._json({
-                    "ok": True,
-                    "account": account.get("email", ""),
-                    "year": year,
-                    "month": month,
-                    "start": start_dt.strftime("%Y-%m-%d"),
-                    "end": end_dt.strftime("%Y-%m-%d"),
-                    "events": result_data.get("events", []),
-                    "calendars": result_data.get("calendars", []),
-                })
-            except urllib.error.HTTPError as e:
-                body = e.read().decode("utf-8", errors="replace")
-                info = parse_google_error_payload(body)
-                reason = (info.get("reason", "") or "").lower()
-                status = (info.get("status", "") or "").upper()
-
-                if reason in {"accessnotconfigured", "service_disabled"} or status == "PERMISSION_DENIED":
-                    return self._json({
-                        "ok": False,
-                        "error_code": "CALENDAR_API_DISABLED",
-                        "error": "Google Calendar API n'est pas activée pour ce projet Google Cloud.",
-                        "details": info.get("message", ""),
-                        "activation_url": info.get("activation_url", ""),
-                    }, 502)
-
-                if reason in {"insufficientpermissions", "access_token_scope_insufficient"}:
-                    return self._json({
-                        "ok": False,
-                        "error_code": "CALENDAR_SCOPE_INSUFFICIENT",
-                        "error": "Le token OAuth n'a pas le scope Google Calendar requis.",
-                        "details": info.get("message", ""),
-                    }, 502)
-
-                return self._json({
-                    "ok": False,
-                    "error_code": "CALENDAR_HTTP_ERROR",
-                    "error": f"Google Calendar HTTP {e.code}",
-                    "details": info.get("message", body),
-                }, 502)
-            except Exception as e:
-                return self._json({"error": str(e)}, 500)
+            return handle_calendar_events_get(
+                self,
+                pick_google_oauth_account=pick_google_oauth_account,
+                list_google_calendar_events=list_google_calendar_events,
+                parse_google_error_payload=parse_google_error_payload,
+            )
         if self.path == "/api/inbox":
             inbox = load_inbox_index()
             # Filter out deleted and sent, sort by date desc
@@ -2335,62 +1274,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         # ── Google Calendar events CRUD ──
         if self.path == "/api/calendar/events":
-            try:
-                account_email = (data.get("account", "") or "").strip()
-                account = pick_google_oauth_account(account_email)
-                if not account:
-                    return self._json({"error": "Aucun compte Google OAuth disponible."}, 404)
-
-                created = create_google_calendar_event(account.get("email", ""), data)
-                return self._json({"ok": True, "event": created})
-            except urllib.error.HTTPError as e:
-                payload, code = build_calendar_http_error_response(e)
-                return self._json(payload, code)
-            except Exception as e:
-                return self._json({"error": str(e)}, 500)
+            return handle_calendar_event_create_post(
+                self,
+                data,
+                pick_google_oauth_account=pick_google_oauth_account,
+                create_google_calendar_event=create_google_calendar_event,
+                build_calendar_http_error_response=build_calendar_http_error_response,
+            )
 
         if self.path == "/api/calendar/events/update":
-            try:
-                account_email = (data.get("account", "") or "").strip()
-                account = pick_google_oauth_account(account_email)
-                if not account:
-                    return self._json({"error": "Aucun compte Google OAuth disponible."}, 404)
-
-                updated = update_google_calendar_event(account.get("email", ""), data)
-                return self._json({"ok": True, "event": updated})
-            except urllib.error.HTTPError as e:
-                payload, code = build_calendar_http_error_response(e)
-                return self._json(payload, code)
-            except Exception as e:
-                return self._json({"error": str(e)}, 500)
+            return handle_calendar_event_update_post(
+                self,
+                data,
+                pick_google_oauth_account=pick_google_oauth_account,
+                update_google_calendar_event=update_google_calendar_event,
+                build_calendar_http_error_response=build_calendar_http_error_response,
+            )
 
         if self.path == "/api/calendar/events/delete":
-            try:
-                account_email = (data.get("account", "") or "").strip()
-                event_id = (data.get("eventId", "") or "").strip()
-                calendar_id = (data.get("calendarId", "") or "").strip() or "primary"
-                account = pick_google_oauth_account(account_email)
-                if not account:
-                    return self._json({"error": "Aucun compte Google OAuth disponible."}, 404)
-                if not event_id:
-                    return self._json({"error": "eventId requis."}, 400)
-
-                delete_google_calendar_event(account.get("email", ""), {
-                    "eventId": event_id,
-                    "calendarId": calendar_id,
-                })
-                return self._json({"ok": True})
-            except urllib.error.HTTPError as e:
-                body = e.read().decode("utf-8", errors="replace")
-                info = parse_google_error_payload(body)
-                return self._json({
-                    "ok": False,
-                    "error_code": "CALENDAR_HTTP_ERROR",
-                    "error": f"Google Calendar HTTP {e.code}",
-                    "details": info.get("message", body),
-                }, 502)
-            except Exception as e:
-                return self._json({"error": str(e)}, 500)
+            return handle_calendar_event_delete_post(
+                self,
+                data,
+                pick_google_oauth_account=pick_google_oauth_account,
+                delete_google_calendar_event=delete_google_calendar_event,
+                parse_google_error_payload=parse_google_error_payload,
+            )
 
         # ── Email autoconfig (Mozilla Thunderbird DB) ──
         if self.path == "/api/autoconfig":
@@ -2543,7 +1451,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         body = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", len(body))
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
