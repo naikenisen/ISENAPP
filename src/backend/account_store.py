@@ -1,3 +1,17 @@
+"""Gestion des comptes email (CRUD + normalisation).
+
+Permet de charger, sauvegarder et rechercher les comptes email
+configurés, avec normalisation des champs d'authentification
+pour assurer la compatibilité ascendante.
+
+Dépendances internes :
+    - app_config  : chemin du fichier accounts.json
+    - json_store  : lecture/écriture atomique JSON
+
+Dépendances externes :
+    (aucune)
+"""
+
 from app_config import ACCOUNTS_FILE
 from json_store import atomic_write_json, read_json_with_backup
 

@@ -1,3 +1,17 @@
+"""Handlers HTTP pour les routes /api/calendar/* et /api/oauth/google/*.
+
+Receive les requêtes HTTP du serveur principal et orchestre les appels
+aux services Google Calendar.  Utilise le pattern d'injection de
+dépendances pour éviter le couplage direct avec les modules de service.
+
+Dépendances internes :
+    (aucune — toutes les dépendances sont injectées via les arguments
+     nommés : pick_google_oauth_account, list_google_calendars, etc.)
+
+Dépendances externes :
+    (aucune)
+"""
+
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 import urllib.error

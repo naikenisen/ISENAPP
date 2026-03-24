@@ -1,3 +1,18 @@
+"""Service Google Calendar — OAuth2 PKCE et API Calendar v3.
+
+Gère l'intégralité du flux OAuth2 Google (PKCE, échange de code,
+rafraîchissement de tokens) ainsi que les opérations CRUD sur
+Google Calendar (lister calendriers, lister/créer/modifier/supprimer
+événements).
+
+Dépendances internes :
+    - account_store : chargement et sauvegarde des comptes (tokens OAuth)
+
+Dépendances externes :
+    - API Google Calendar v3 (googleapis.com)
+    - API Google OAuth2 (accounts.google.com)
+"""
+
 import base64
 import hashlib
 import json

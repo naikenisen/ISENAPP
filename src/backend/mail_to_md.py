@@ -1,3 +1,17 @@
+"""Conversion massive d'emails (.eml / .mbox) en fichiers Markdown pour le Graph.
+
+Script autonome qui parcourt un répertoire source contenant des emails
+(formats .eml, .mbox, ou mbox sans extension), les convertit en fichiers
+Markdown avec frontmatter YAML (tags, métadonnées), et extrait les
+pièces jointes.
+
+Dépendances internes :
+    (aucune — script autonome exécuté via subprocess)
+
+Dépendances externes :
+    - html2text : conversion HTML → texte brut
+"""
+
 import os
 import email
 from email import policy

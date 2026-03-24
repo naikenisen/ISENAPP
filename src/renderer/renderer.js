@@ -1007,22 +1007,22 @@ function buildHtmlBody(bodyText, signatureHtml) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   Run v3.py
+   Run mail_to_md.py
    ═══════════════════════════════════════════════════════ */
 async function runV3() {
     const outEl = document.getElementById('v3output');
     outEl.style.display = 'block';
-    outEl.textContent = '⏳ Exécution de v3.py en cours…\n';
+    outEl.textContent = '⏳ Exécution de mail_to_md.py en cours…\n';
     try {
-        const r = await fetch('/api/run-v3', { method: 'POST' });
+        const r = await fetch('/api/run-mail-to-md', { method: 'POST' });
         const result = await r.json();
         if (result.ok) {
             outEl.textContent = result.output || 'Terminé (aucune sortie)';
             await loadInbox();
-            showToast('v3.py exécuté avec succès !', 'success');
+            showToast('mail_to_md.py exécuté avec succès !', 'success');
         } else {
             outEl.textContent = 'Erreur :\n' + (result.error || result.output || 'Erreur inconnue');
-            showToast('Erreur v3.py', 'error', 3000);
+            showToast('Erreur mail_to_md.py', 'error', 3000);
         }
     } catch (e) {
         outEl.textContent = 'Erreur réseau : ' + e.message;
@@ -1965,7 +1965,7 @@ function renderInboxReader(mail) {
                 <button onclick="replyToMail('${esc(mail.id)}')"><i class="icon-reply"></i> Répondre</button>
                 <button onclick="replyToMail('${esc(mail.id)}', true)"><i class="icon-reply"></i> Répondre à tous</button>
                 <button onclick="forwardMail('${esc(mail.id)}')"><i class="icon-forward"></i> Transférer</button>
-                <button onclick="exportMailObsidian('${esc(mail.id)}')"><i class="icon-book-open"></i> Exporter</button>
+                <button onclick="exportMailGraph('${esc(mail.id)}')"><i class="icon-book-open"></i> Exporter</button>
                 <button onclick="toggleInboxRead('${esc(mail.id)}')">${mail.read ? '<i class="icon-mail-open"></i> Marquer non lu' : '<i class="icon-mail"></i> Marquer lu'}</button>
                 <button class="danger" onclick="openDeleteMailModal('${esc(mail.id)}')"><i class="icon-trash-2"></i> Supprimer</button>
             </div>
@@ -2109,17 +2109,17 @@ function forwardMail(mailId) {
     document.getElementById('mailToInput').focus();
 }
 
-async function exportMailObsidian(mailId) {
-    showLoading('Export vers Obsidian…');
+async function exportMailGraph(mailId) {
+    showLoading('Export vers Graph…');
     try {
-        const r = await fetch('/api/mail/export-obsidian', {
+        const r = await fetch('/api/mail/export-graph', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: mailId })
         });
         const result = await r.json();
         if (result.ok) {
-            showToast('Exporté vers Obsidian !', 'success', 3000);
+            showToast('Exporté vers Graph !', 'success', 3000);
         } else {
             showToast('Erreur : ' + (result.error || 'Erreur'), 'error', 5000);
         }
@@ -2130,10 +2130,10 @@ async function exportMailObsidian(mailId) {
     }
 }
 
-async function exportAllObsidian() {
-    showLoading('Export de tous les mails vers Obsidian…');
+async function exportAllGraph() {
+    showLoading('Export de tous les mails vers Graph…');
     try {
-        const r = await fetch('/api/mail/export-obsidian-all', { method: 'POST' });
+        const r = await fetch('/api/mail/export-graph-all', { method: 'POST' });
         const result = await r.json();
         if (result.ok) {
             const errStr = result.errors && result.errors.length
@@ -3149,7 +3149,7 @@ function resolveVaultLink(baseRelpath, linkTarget) {
     return { type: 'vault', target: combined || normalizedTarget };
 }
 
-function preprocessObsidianMarkdown(content) {
+function preprocessGraphMarkdown(content) {
     return String(content || '')
         .replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, link, alt) => `![${alt || link}](vault:${link})`)
         .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, link, label) => `[${label || link}](vault:${link})`);
@@ -3171,7 +3171,7 @@ async function renderGraphMarkdown(title, relpath, markdownContent, bodyEl) {
     renderer.html = (html) => esc(html);
     marked.setOptions({ gfm: true, breaks: true, renderer });
 
-    const rendered = marked.parse(preprocessObsidianMarkdown(markdownContent));
+    const rendered = marked.parse(preprocessGraphMarkdown(markdownContent));
     bodyEl.innerHTML = `<div class="graph-markdown">${rendered}</div>`;
 
     // Resolve inline markdown images relative to the current note.

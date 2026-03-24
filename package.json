@@ -1,7 +1,7 @@
 {
   "name": "isenapp",
   "version": "1.0.0",
-  "description": "ISENAPP — Client email Electron avec gestion de tâches, autoconfig email et visualisation Obsidian",
+  "description": "ISENAPP — Client email Electron avec gestion de tâches, autoconfig email et visualisation Graph",
   "author": {
     "name": "Isen Naiken",
     "email": "isen.naiken@nexomedis.com"
@@ -42,8 +42,8 @@
         "to": "src/backend/server.py"
       },
       {
-        "from": "src/backend/v3.py",
-        "to": "src/backend/v3.py"
+        "from": "src/backend/mail_to_md.py",
+        "to": "src/backend/mail_to_md.py"
       },
       {
         "from": "data/data.json",

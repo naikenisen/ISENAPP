@@ -1,3 +1,18 @@
+"""Protocoles email — POP3, IMAP et SMTP.
+
+Implémente les opérations réseau de récupération (POP3 / IMAP),
+d'envoi (SMTP) et de suppression d'emails sur serveur.  Utilise
+le pattern d'injection de dépendances (DI) via des arguments nommés
+pour éviter les imports circulaires avec les modules de stockage.
+
+Dépendances internes :
+    (aucune — toutes les dépendances sont injectées via les arguments
+     nommés : load_seen_uids, save_seen_uids, compute_mail_id, etc.)
+
+Dépendances externes :
+    - imaplib, poplib, smtplib (stdlib)
+"""
+
 import base64
 import hashlib
 import imaplib

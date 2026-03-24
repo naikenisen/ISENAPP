@@ -1,3 +1,16 @@
+"""Configuration et chemins de l'application ISENAPP.
+
+Centralise toutes les constantes de configuration : port du serveur,
+chemins des fichiers de données, répertoires du graphe, scopes OAuth
+Google, et bootstrap des fichiers par défaut.
+
+Dépendances internes :
+    (aucune — module racine de configuration)
+
+Dépendances externes :
+    (aucune)
+"""
+
 import os
 import shutil
 from pathlib import Path
@@ -48,16 +61,16 @@ ACCOUNTS_FILE = os.path.join(APP_DATA_DIR, "accounts.json")
 INBOX_INDEX_FILE = os.path.join(APP_DATA_DIR, "inbox_index.json")
 
 ISENAPP_DATA = str(Path.home() / "Documents" / "isenapp_mails")
-OBSIDIAN_MD_DIR = os.path.join(ISENAPP_DATA, "mails")
-OBSIDIAN_ATT_DIR = os.path.join(ISENAPP_DATA, "attachements")
-OBSIDIAN_VAULT = ISENAPP_DATA
+GRAPH_MD_DIR = os.path.join(ISENAPP_DATA, "mails")
+GRAPH_ATT_DIR = os.path.join(ISENAPP_DATA, "attachements")
+GRAPH_VAULT = ISENAPP_DATA
 
 GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar"
 GOOGLE_MAIL_SCOPE = "https://mail.google.com/"
 
 os.makedirs(MAILS_DIR, exist_ok=True)
-os.makedirs(OBSIDIAN_MD_DIR, exist_ok=True)
-os.makedirs(OBSIDIAN_ATT_DIR, exist_ok=True)
+os.makedirs(GRAPH_MD_DIR, exist_ok=True)
+os.makedirs(GRAPH_ATT_DIR, exist_ok=True)
 
 if not os.path.isdir(DOWNLOADS):
     DOWNLOADS = str(Path.home() / "Downloads")

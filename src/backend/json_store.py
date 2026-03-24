@@ -1,3 +1,16 @@
+"""Lecture et écriture atomique de fichiers JSON.
+
+Fournit deux fonctions principales : lecture avec fallback sur un
+fichier .bak, et écriture atomique (tmp → rename) avec backup
+automatique de la version précédente.
+
+Dépendances internes :
+    (aucune — module utilitaire bas niveau)
+
+Dépendances externes :
+    (aucune)
+"""
+
 import json
 import os
 import shutil

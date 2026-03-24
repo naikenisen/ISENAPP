@@ -223,8 +223,18 @@ ISENAPP/
 │   │   ├── styles.css       # 🎨 Feuille de styles
 │   │   └── renderer.js      #    Point d'entrée renderer
 │   └── backend/
-│       ├── server.py        # 🐍 Serveur HTTP Python (API locale)
-│       └── v3.py            #    Module complémentaire backend
+│       ├── server.py            # 🐍 Serveur HTTP Python (API locale)
+│       ├── app_config.py        # ⚙️  Configuration et chemins
+│       ├── json_store.py        # 💾 Lecture/écriture atomique JSON
+│       ├── account_store.py     # 👤 CRUD comptes email
+│       ├── mail_utils.py        # 📧 Parsing email, .eml I/O, index
+│       ├── mail_service.py      # 📨 Protocoles POP3/IMAP/SMTP
+│       ├── mail_to_md.py        # 🗒️  Conversion emails → Markdown Graph
+│       ├── google_calendar_service.py  # 📅 OAuth2 Google + Calendar API
+│       ├── calendar_routes.py   # 🛣️  Routes HTTP calendrier
+│       ├── ai_service.py        # 🧠 Appels IA Google Gemini
+│       ├── graph_service.py     # 🔮 Graphe de connaissances + export email
+│       └── autoconfig_service.py # 🔍 Auto-détection IMAP/SMTP
 ├── package.json             # Configuration npm & electron-builder
 ├── requirements.txt         # Dépendances Python
 └── README.md                # Ce fichier
