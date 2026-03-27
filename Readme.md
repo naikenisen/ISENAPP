@@ -1,6 +1,6 @@
 <div align="center">
 
-# ISENAPP
+# NeuRail
 
 Client de bureau Electron et Python pour centraliser la gestion des tâches, des emails, des rappels, des leads et de l'agenda dans une interface unique.
 
